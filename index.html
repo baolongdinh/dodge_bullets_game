@@ -35,6 +35,7 @@
             top: 50%;
             transform: translate(-50%, -50%);
             border-radius: 10px;
+            transition: transform 0.3s; /* Animation effect */
         }
 
         .bullet {
@@ -47,6 +48,13 @@
             position: absolute;
             background-color: #65EBFF;
             border-radius: 5px;
+        }
+
+        .shield {
+            position: absolute;
+            border: 2px solid #FFD700;
+            border-radius: 50%;
+            pointer-events: none;
         }
 
         #hp {
@@ -74,6 +82,14 @@
             font-weight: bold;
             display: none;
         }
+
+        .cooldown {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+            font-weight: bold;
+        }
     </style>
 </head>
 
@@ -88,6 +104,7 @@
             <div id="hp">HP: 100</div>
             <div id="score">Score: 0</div>
             <div id="gameOver">Game Over! Press R to Restart</div>
+            <div class="cooldown" id="cooldownDisplay">Cooldowns: Q: 0s, W: 0s, E: 0s</div>
         </div>
     </div>
 
@@ -97,15 +114,33 @@
         const hpDisplay = document.getElementById('hp');
         const scoreDisplay = document.getElementById('score');
         const gameOverDisplay = document.getElementById('gameOver');
-        const Bullet = "bullet"
-        const Heal = "heal"
+        const cooldownDisplay = document.getElementById('cooldownDisplay');
+        const Bullet = "bullet";
+        const Heal = "heal";
         let timeSpawnBullets;
         let spawnBulletsOneTime;
-        const manMove = 20;
-
+        const baseManMove = 20;
+        const speedBoost = 40; // Increased speed for Skill Q
+        const shieldDuration = 5000; // Shield lasts for 5 seconds
+        const healAmount = 20; // Amount healed
         let hp = 100;
-        let score = 0
+        let score = 0;
         let gameOver = false;
+        let shieldActive = false;
+
+        // Cooldown times in seconds
+        const cooldownTimes = {
+            Q: 25,
+            W: 10,
+            E: 40
+        };
+
+        // Remaining cooldowns
+        const remainingCooldowns = {
+            Q: 0,
+            W: 0,
+            E: 0
+        };
 
         document.addEventListener('keydown', (event) => {
             if (gameOver && event.key === 'r') {
@@ -114,16 +149,25 @@
             if (!gameOver) {
                 switch (event.key) {
                     case 'ArrowLeft':
-                        moveMan(-manMove, 0);
+                        moveMan(-baseManMove, 0);
                         break;
                     case 'ArrowRight':
-                        moveMan(manMove, 0);
+                        moveMan(baseManMove, 0);
                         break;
                     case 'ArrowUp':
-                        moveMan(0, -manMove);
+                        moveMan(0, -baseManMove);
                         break;
                     case 'ArrowDown':
-                        moveMan(0, manMove);
+                        moveMan(0, baseManMove);
+                        break;
+                    case 'q': // Activate Skill Q
+                        activateSkillQ();
+                        break;
+                    case 'w': // Activate Skill W
+                        activateSkillW();
+                        break;
+                    case 'e': // Activate Skill E
+                        activateSkillE();
                         break;
                 }
             }
@@ -142,12 +186,116 @@
             }
         }
 
+        function activateSkillQ() {
+            if (remainingCooldowns.Q === 0) {
+                shieldActive = true;
+                startCooldown('Q');
+
+                const shield = document.createElement('div');
+                shield.classList.add('shield');
+                shield.style.width = '50px';
+                shield.style.height = '50px';
+                shield.style.left = (man.offsetLeft - 24) + 'px';
+                shield.style.top = (man.offsetTop - 25) + 'px';
+                gameCanvas.appendChild(shield);
+
+                // Move the shield with the man
+                const moveShield = setInterval(() => {
+                    if (shieldActive) {
+                        shield.style.left = (man.offsetLeft - 25) + 'px';
+                        shield.style.top = (man.offsetTop - 25) + 'px';
+                    }
+                }, 20);
+
+                // Remove the shield after the duration
+                setTimeout(() => {
+                    shieldActive = false;
+                    clearInterval(moveShield);
+                    gameCanvas.removeChild(shield);
+                }, shieldDuration);
+            }
+        }
+
+        function activateSkillW() {
+            if (remainingCooldowns.W === 0) {
+                moveFaster();
+                startCooldown('W');
+            }
+        }
+
+        function activateSkillE() {
+            if (remainingCooldowns.E === 0) {
+                heal(healAmount);
+                startCooldown('E');
+                animateHeal(); // Trigger healing animation
+            }
+        }
+
+        function animateHeal() {
+            man.style.transform = 'scale(2.5)'; // Scale up
+            setTimeout(() => {
+                man.style.transform = 'scale(1)'; // Scale back down
+            }, 300); // Duration of the scale effect
+        }
+
+        function startCooldown(skill) {
+            remainingCooldowns[skill] = cooldownTimes[skill];
+            updateCooldownDisplay();
+
+            const cooldownInterval = setInterval(() => {
+                remainingCooldowns[skill]--;
+                updateCooldownDisplay();
+
+                if (remainingCooldowns[skill] <= 0) {
+                    clearInterval(cooldownInterval);
+                    remainingCooldowns[skill] = 0;
+                    updateCooldownDisplay();
+                }
+            }, 1000);
+        }
+
+        function updateCooldownDisplay() {
+            cooldownDisplay.textContent = `Cooldowns: Q: ${remainingCooldowns.Q}s, W: ${remainingCooldowns.W}s, E: ${remainingCooldowns.E}s`;
+        }
+
+        function activateShield() {
+            if (!shieldActive) {
+                shieldActive = true;
+                const shield = document.createElement('div');
+                shield.classList.add('shield');
+                shield.style.width = '50px';
+                shield.style.height = '50px';
+                shield.style.left = (man.offsetLeft - 15) + 'px';
+                shield.style.top = (man.offsetTop - 15) + 'px';
+                gameCanvas.appendChild(shield);
+
+                setTimeout(() => {
+                    shieldActive = false;
+                    gameCanvas.removeChild(shield);
+                }, 3000); // Shield lasts for 3 seconds
+            }
+        }
+
+
+        function moveFaster() {
+            baseManMove += 20
+                // setTimeout(() => {
+                //     baseManMove -= 20
+                // }, 10000); 
+        }
+
+
+        function heal(amount) {
+            hp += amount;
+            if (hp > 100) hp = 100; // Max HP cap
+            hpDisplay.textContent = 'HP: ' + hp;
+        }
+
         function spawnBullets() {
-            let spawn
-            spawn = spawnBulletsOneTime
-            difficulty = Math.floor(score / 30)
+            let spawn = spawnBulletsOneTime;
+            const difficulty = Math.floor(score / 30);
             if (difficulty > 0) {
-                spawn += difficulty
+                spawn += difficulty;
             }
 
             const directions = ['top', 'left', 'right', 'bottom'];
@@ -156,28 +304,16 @@
             }
 
             createObject(directions[Math.floor(Math.random() * directions.length)], Heal);
-
-        }
-
-
-
-
-
-
-        function getRandomInt(min, max) {
-            return Math.floor(Math.random() * (max - min + 1)) + min;
         }
 
         function createObject(direction, objectName) {
             const object = document.createElement('div');
             object.classList.add(objectName);
 
-            // Randomize object size
             const bulletWidth = Math.random() * 20 + 3;
             object.style.width = direction === 'left' || direction === 'right' ? '10px' : bulletWidth + 'px';
             object.style.height = direction === 'left' || direction === 'right' ? bulletWidth + 'px' : '10px';
 
-            // Set object starting position based on direction
             if (direction === 'top') {
                 object.style.left = Math.random() * (gameCanvas.clientWidth - bulletWidth) + 'px';
                 object.style.top = '0px';
@@ -222,16 +358,17 @@
                     bulletRect.left <= manRect.right
                 ) {
                     if (hp > 0) {
-
                         if (objectName === Bullet) {
-                            hp -= bulletWidth;
+                            if (!shieldActive) {
+                                hp -= bulletWidth;
+                            }
                         } else {
                             hp += bulletWidth;
                         }
 
                         hp = Math.floor(hp);
                         if (hp < 0) {
-                            hp = 0
+                            hp = 0;
                         }
                         hpDisplay.textContent = 'HP: ' + hp;
                     }
@@ -262,7 +399,7 @@
 
         function selectDifficulty() {
             return new Promise((resolve) => {
-                const selectedDifficulty = prompt("Welcome to the Dodge Bullets Game! Please select your difficulty:\n1. Easy\n2. Normal\n3. Hard\n4. So Fucking Hard");
+                const selectedDifficulty = prompt("Welcome to the Dodge Bullets Game! Please select your difficulty:\n1. Easy\n2. Normal\n3. Hard\n4. So Hard");
                 switch (selectedDifficulty) {
                     case '1':
                         timeSpawnBullets = 800;
@@ -287,7 +424,6 @@
                 resolve();
             });
         }
-
 
         // Function to update the score
         function updateScore() {
