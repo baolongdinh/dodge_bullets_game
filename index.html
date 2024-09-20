@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dodge the Bullets Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #e0f7fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Arial', sans-serif;
+        }
+
+        #gameCanvas {
+            width: 1200px;
+            height: 800px;
+            background-color: #fff;
+            border: 2px solid #333;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .man {
+            width: 20px;
+            height: 20px;
+            background-color: #4CAF50;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 10px;
+        }
+
+        .bullet {
+            position: absolute;
+            background-color: #FF5722;
+            border-radius: 5px;
+        }
+
+        #hp {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 150px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 30px;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+   
+    <div>
+        <div>
+            <h1> Dodge Bullets Game</h1>
+        </div>
+        <div id="gameCanvas">
+            <div class="man" id="man"></div>
+            <div id="hp">HP: 100</div>
+            <div id="score">Score: 0</div>
+            <div id="gameOver">Game Over! Press R to Restart</div>
+        </div>
+    </div>
+  
+    <script>
+        const man = document.getElementById('man');
+        const gameCanvas = document.getElementById('gameCanvas');
+        const hpDisplay = document.getElementById('hp');
+        const scoreDisplay = document.getElementById('score');
+        const gameOverDisplay = document.getElementById('gameOver');
+        let timeSpawnBullets;
+        let spawnBulletsOneTime;
+        const manMove = 30;
+
+        let hp = 100;
+        let score = 0
+        let gameOver = false;
+
+        document.addEventListener('keydown', (event) => {
+            if (gameOver && event.key === 'r') {
+                location.reload(); // Reload the page to restart
+            }
+            if (!gameOver) {
+                switch (event.key) {
+                    case 'ArrowLeft':
+                        moveMan(-manMove, 0);
+                        break;
+                    case 'ArrowRight':
+                        moveMan(manMove, 0);
+                        break;
+                    case 'ArrowUp':
+                        moveMan(0, -manMove);
+                        break;
+                    case 'ArrowDown':
+                        moveMan(0, manMove);
+                        break;
+                }
+            }
+        });
+
+        function moveMan(x, y) {
+            const manPositionX = man.offsetLeft + x;
+            const manPositionY = man.offsetTop + y;
+
+            // Check boundaries
+            if (manPositionX >= 0 && manPositionX <= gameCanvas.clientWidth - man.clientWidth) {
+                man.style.left = manPositionX + 'px';
+            }
+            if (manPositionY >= 0 && manPositionY <= gameCanvas.clientHeight - man.clientHeight) {
+                man.style.top = manPositionY + 'px';
+            }
+        }
+
+        function spawnBullets() {
+
+            let spawn 
+            spawn = spawnBulletsOneTime
+            difficulty = Math.floor(score / 30)
+            if (difficulty > 0) {
+                spawn += difficulty
+            }
+
+
+            const directions = ['top', 'left', 'right', 'bottom'];
+            for (let i = 0; i < spawn; i++) {
+                createBullet(directions[Math.floor(Math.random() * directions.length)]);
+            }
+        }
+
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function createBullet(direction) {
+            const bullet = document.createElement('div');
+            bullet.classList.add('bullet');
+
+            // Randomize bullet size
+            const bulletWidth = Math.random() * 20 + 3;
+            bullet.style.width = direction === 'left' || direction === 'right' ? '10px' : bulletWidth + 'px';
+            bullet.style.height = direction === 'left' || direction === 'right' ? bulletWidth + 'px' : '10px';
+
+            // Set bullet starting position based on direction
+            if (direction === 'top') {
+                bullet.style.left = Math.random() * (gameCanvas.clientWidth - bulletWidth) + 'px';
+                bullet.style.top = '0px';
+            } else if (direction === 'bottom') {
+                bullet.style.left = Math.random() * (gameCanvas.clientWidth - bulletWidth) + 'px';
+                bullet.style.top = gameCanvas.clientHeight - bullet.offsetHeight + 'px';
+            } else if (direction === 'left') {
+                bullet.style.left = '0px';
+                bullet.style.top = Math.random() * (gameCanvas.clientHeight - bulletWidth) + 'px';
+            } else if (direction === 'right') {
+                bullet.style.left = (gameCanvas.clientWidth - bulletWidth) + 'px';
+                bullet.style.top = Math.random() * (gameCanvas.clientHeight - bulletWidth) + 'px';
+            }
+
+            gameCanvas.appendChild(bullet);
+
+            const interval = setInterval(() => {
+                let bulletPosition;
+
+                if (direction === 'top') {
+                    bulletPosition = parseInt(bullet.style.top) + 5; // Move down
+                    bullet.style.top = bulletPosition + 'px';
+                } else if (direction === 'bottom') {
+                    bulletPosition = parseInt(bullet.style.top) - 5; // Move up
+                    bullet.style.top = bulletPosition + 'px';
+                } else if (direction === 'left') {
+                    bulletPosition = parseInt(bullet.style.left) + 5; // Move right
+                    bullet.style.left = bulletPosition + 'px';
+                } else if (direction === 'right') {
+                    bulletPosition = parseInt(bullet.style.left) - 5; // Move left
+                    bullet.style.left = bulletPosition + 'px';
+                }
+
+                // Check for collision with the man
+                const manRect = man.getBoundingClientRect();
+                const bulletRect = bullet.getBoundingClientRect();
+
+                if (
+                    bulletRect.bottom >= manRect.top &&
+                    bulletRect.top <= manRect.bottom &&
+                    bulletRect.right >= manRect.left &&
+                    bulletRect.left <= manRect.right
+                ) {
+                    if (hp > 0) {
+                        hp -= 20; // Decrease HP by 20
+                        hpDisplay.textContent = 'HP: ' + hp;
+                    }
+                    clearInterval(interval);
+                    gameCanvas.removeChild(bullet);
+                    if (hp <= 0) {
+                        endGame();
+                    }
+                }
+
+                // Remove bullet if it goes off the screen
+                if ((direction === 'top' && bulletPosition > gameCanvas.clientHeight) ||
+                    (direction === 'bottom' && bulletPosition < -10) ||
+                    (direction === 'left' && bulletPosition > gameCanvas.clientWidth) ||
+                    (direction === 'right' && bulletPosition < -10)) {
+                    clearInterval(interval);
+                    gameCanvas.removeChild(bullet);
+                }
+            }, 20);
+        }
+
+        function endGame() {
+            gameOver = true;
+            clearInterval(bulletInterval); // Stop creating new bullets
+            clearInterval(scoreInterval); // Stop creating new bullets
+            gameOverDisplay.style.display = 'block';
+        }
+
+        function selectDifficulty() {
+            return new Promise((resolve) => {
+                const selectedDifficulty = prompt("Welcome to the Dodge Bullets Game! Please select your difficulty:\n1. Easy\n2. Normal\n3. Hard\n4. Insane");
+                switch (selectedDifficulty) {
+                    case '1':
+                        timeSpawnBullets = 800;
+                        spawnBulletsOneTime = 1;
+                        break;
+                    case '2':
+                        timeSpawnBullets = 600;
+                        spawnBulletsOneTime = 2;
+                        break;
+                    case '3':
+                        timeSpawnBullets = 500;
+                        spawnBulletsOneTime = 3;
+                        break;
+                    case '4':
+                        timeSpawnBullets = 300;
+                        spawnBulletsOneTime = 4;
+                        break;
+                    default:
+                        timeSpawnBullets = 600;
+                        spawnBulletsOneTime = 2;
+                }
+                resolve();
+            });
+        }
+
+
+        // Function to update the score
+        function updateScore() {
+            score += 1; // Increment score by 1
+            scoreDisplay.textContent = 'Score: ' + score; // Update the displayed score
+        }
+
+        async function init() {
+            await selectDifficulty();
+
+            scoreInterval = setInterval(updateScore, 1000);
+
+            bulletInterval = setInterval(spawnBullets, timeSpawnBullets); // Create bullets based on selected difficulty
+        }
+
+        window.onload = init; // Start the game when the page loads
+    </script>
+</body>
+
+</html>
