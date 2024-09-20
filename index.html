@@ -208,7 +208,11 @@
                     bulletRect.left <= manRect.right
                 ) {
                     if (hp > 0) {
-                        hp -= 20; // Decrease HP by 20
+                        hp -= bulletWidth; 
+                        hp = Math.floor(hp);
+                        if (hp < 0) { 
+                            hp = 0
+                        }
                         hpDisplay.textContent = 'HP: ' + hp;
                     }
                     clearInterval(interval);
@@ -231,14 +235,14 @@
 
         function endGame() {
             gameOver = true;
-            clearInterval(bulletInterval); // Stop creating new bullets
-            clearInterval(scoreInterval); // Stop creating new bullets
+            clearInterval(bulletInterval);
+            clearInterval(scoreInterval);
             gameOverDisplay.style.display = 'block';
         }
 
         function selectDifficulty() {
             return new Promise((resolve) => {
-                const selectedDifficulty = prompt("Welcome to the Dodge Bullets Game! Please select your difficulty:\n1. Easy\n2. Normal\n3. Hard\n4. Insane");
+                const selectedDifficulty = prompt("Welcome to the Dodge Bullets Game! Please select your difficulty:\n1. Easy\n2. Normal\n3. Hard\n4. So Fucking Hard");
                 switch (selectedDifficulty) {
                     case '1':
                         timeSpawnBullets = 800;
