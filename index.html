@@ -43,6 +43,12 @@
             border-radius: 5px;
         }
 
+        .heal {
+            position: absolute;
+            background-color: #65EBFF;
+            border-radius: 5px;
+        }
+
         #hp {
             position: absolute;
             top: 10px;
@@ -72,7 +78,7 @@
 </head>
 
 <body>
-   
+
     <div>
         <div>
             <h1> Dodge Bullets Game</h1>
@@ -84,13 +90,15 @@
             <div id="gameOver">Game Over! Press R to Restart</div>
         </div>
     </div>
-  
+
     <script>
         const man = document.getElementById('man');
         const gameCanvas = document.getElementById('gameCanvas');
         const hpDisplay = document.getElementById('hp');
         const scoreDisplay = document.getElementById('score');
         const gameOverDisplay = document.getElementById('gameOver');
+        const Bullet = "bullet"
+        const Heal = "heal"
         let timeSpawnBullets;
         let spawnBulletsOneTime;
         const manMove = 30;
@@ -135,71 +143,77 @@
         }
 
         function spawnBullets() {
-
-            let spawn 
+            let spawn
             spawn = spawnBulletsOneTime
             difficulty = Math.floor(score / 30)
             if (difficulty > 0) {
                 spawn += difficulty
             }
 
-
             const directions = ['top', 'left', 'right', 'bottom'];
             for (let i = 0; i < spawn; i++) {
-                createBullet(directions[Math.floor(Math.random() * directions.length)]);
+                createObject(directions[Math.floor(Math.random() * directions.length)], Bullet);
             }
+
+            createObject(directions[Math.floor(Math.random() * directions.length)], Heal);
+
         }
+
+
+
+
+
 
         function getRandomInt(min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
         }
 
-        function createBullet(direction) {
-            const bullet = document.createElement('div');
-            bullet.classList.add('bullet');
+        function createObject(direction, objectName) {
+            const object = document.createElement('div');
+            object.classList.add(objectName);
 
-            // Randomize bullet size
+            // Randomize object size
             const bulletWidth = Math.random() * 20 + 3;
-            bullet.style.width = direction === 'left' || direction === 'right' ? '10px' : bulletWidth + 'px';
-            bullet.style.height = direction === 'left' || direction === 'right' ? bulletWidth + 'px' : '10px';
+            object.style.width = direction === 'left' || direction === 'right' ? '10px' : bulletWidth + 'px';
+            object.style.height = direction === 'left' || direction === 'right' ? bulletWidth + 'px' : '10px';
 
-            // Set bullet starting position based on direction
+            // Set object starting position based on direction
             if (direction === 'top') {
-                bullet.style.left = Math.random() * (gameCanvas.clientWidth - bulletWidth) + 'px';
-                bullet.style.top = '0px';
+                object.style.left = Math.random() * (gameCanvas.clientWidth - bulletWidth) + 'px';
+                object.style.top = '0px';
             } else if (direction === 'bottom') {
-                bullet.style.left = Math.random() * (gameCanvas.clientWidth - bulletWidth) + 'px';
-                bullet.style.top = gameCanvas.clientHeight - bullet.offsetHeight + 'px';
+                object.style.left = Math.random() * (gameCanvas.clientWidth - bulletWidth) + 'px';
+                object.style.top = gameCanvas.clientHeight - object.offsetHeight + 'px';
             } else if (direction === 'left') {
-                bullet.style.left = '0px';
-                bullet.style.top = Math.random() * (gameCanvas.clientHeight - bulletWidth) + 'px';
+                object.style.left = '0px';
+                object.style.top = Math.random() * (gameCanvas.clientHeight - bulletWidth) + 'px';
             } else if (direction === 'right') {
-                bullet.style.left = (gameCanvas.clientWidth - bulletWidth) + 'px';
-                bullet.style.top = Math.random() * (gameCanvas.clientHeight - bulletWidth) + 'px';
+                object.style.left = (gameCanvas.clientWidth - bulletWidth) + 'px';
+                object.style.top = Math.random() * (gameCanvas.clientHeight - bulletWidth) + 'px';
             }
 
-            gameCanvas.appendChild(bullet);
+            gameCanvas.appendChild(object);
 
             const interval = setInterval(() => {
-                let bulletPosition;
+                let objectPosition;
 
                 if (direction === 'top') {
-                    bulletPosition = parseInt(bullet.style.top) + 5; // Move down
-                    bullet.style.top = bulletPosition + 'px';
+                    objectPosition = parseInt(object.style.top) + 5; // Move down
+                    object.style.top = objectPosition + 'px';
                 } else if (direction === 'bottom') {
-                    bulletPosition = parseInt(bullet.style.top) - 5; // Move up
-                    bullet.style.top = bulletPosition + 'px';
+                    objectPosition = parseInt(object.style.top) - 5; // Move up
+                    object.style.top = objectPosition + 'px';
                 } else if (direction === 'left') {
-                    bulletPosition = parseInt(bullet.style.left) + 5; // Move right
-                    bullet.style.left = bulletPosition + 'px';
+                    objectPosition = parseInt(object.style.left) + 5; // Move right
+                    object.style.left = objectPosition + 'px';
                 } else if (direction === 'right') {
-                    bulletPosition = parseInt(bullet.style.left) - 5; // Move left
-                    bullet.style.left = bulletPosition + 'px';
+                    objectPosition = parseInt(object.style.left) - 5; // Move left
+                    object.style.left = objectPosition + 'px';
                 }
 
                 // Check for collision with the man
                 const manRect = man.getBoundingClientRect();
-                const bulletRect = bullet.getBoundingClientRect();
+                const bulletRect = object.getBoundingClientRect();
 
                 if (
                     bulletRect.bottom >= manRect.top &&
@@ -208,27 +222,33 @@
                     bulletRect.left <= manRect.right
                 ) {
                     if (hp > 0) {
-                        hp -= bulletWidth; 
+
+                        if (objectName === Bullet) {
+                            hp -= bulletWidth;
+                        } else {
+                            hp += bulletWidth;
+                        }
+
                         hp = Math.floor(hp);
-                        if (hp < 0) { 
+                        if (hp < 0) {
                             hp = 0
                         }
                         hpDisplay.textContent = 'HP: ' + hp;
                     }
                     clearInterval(interval);
-                    gameCanvas.removeChild(bullet);
+                    gameCanvas.removeChild(object);
                     if (hp <= 0) {
                         endGame();
                     }
                 }
 
-                // Remove bullet if it goes off the screen
-                if ((direction === 'top' && bulletPosition > gameCanvas.clientHeight) ||
-                    (direction === 'bottom' && bulletPosition < -10) ||
-                    (direction === 'left' && bulletPosition > gameCanvas.clientWidth) ||
-                    (direction === 'right' && bulletPosition < -10)) {
+                // Remove object if it goes off the screen
+                if ((direction === 'top' && objectPosition > gameCanvas.clientHeight) ||
+                    (direction === 'bottom' && objectPosition < -10) ||
+                    (direction === 'left' && objectPosition > gameCanvas.clientWidth) ||
+                    (direction === 'right' && objectPosition < -10)) {
                     clearInterval(interval);
-                    gameCanvas.removeChild(bullet);
+                    gameCanvas.removeChild(object);
                 }
             }, 20);
         }
@@ -277,9 +297,7 @@
 
         async function init() {
             await selectDifficulty();
-
             scoreInterval = setInterval(updateScore, 1000);
-
             bulletInterval = setInterval(spawnBullets, timeSpawnBullets); // Create bullets based on selected difficulty
         }
 
