@@ -123,7 +123,7 @@
         const Heal = "heal";
         let timeSpawnBullets;
         let spawnBulletsOneTime;
-        const baseManMove = 20;
+        const baseManMove = 7;
         const shieldDuration = 5000; // Shield lasts for 5 seconds
         const healAmount = 20; // Amount healed
         let hp = 100;
@@ -147,43 +147,45 @@
             R: 0
         };
 
+        let keys = {};
+        const velocity = { x: 0, y: 0 };
+
+        // Event listeners for keydown and keyup
         document.addEventListener('keydown', (event) => {
             if (gameOver && event.key === 'r') {
                 location.reload(); // Reload the page to restart
             }
+
             if (!gameOver) {
-                switch (event.key) {
-                    case 'ArrowLeft':
-                        moveMan(-baseManMove, 0);
-                        break;
-                    case 'ArrowRight':
-                        moveMan(baseManMove, 0);
-                        break;
-                    case 'ArrowUp':
-                        moveMan(0, -baseManMove);
-                        break;
-                    case 'ArrowDown':
-                        moveMan(0, baseManMove);
-                        break;
-                    case 'q': // Activate Skill Q
-                        activateSkillQ();
-                        break;
-                    case 'w': // Activate Skill W
-                        activateSkillW();
-                        break;
-                    case 'e': // Activate Skill E
-                        activateSkillE();
-                        break;
-                    case 'r': // Activate Skill R
-                        activateSkillR();
-                        break;
-                }
+                keys[event.key] = true; // Mark the key as pressed
             }
         });
 
-        function moveMan(x, y) {
-            const manPositionX = man.offsetLeft + x;
-            const manPositionY = man.offsetTop + y;
+        document.addEventListener('keyup', (event) => {
+            keys[event.key] = false; // Mark the key as not pressed
+        });
+
+        // Update velocity based on key states
+        function updateVelocity() {
+            velocity.x = 0;
+            velocity.y = 0;
+
+            if (keys['ArrowLeft']) velocity.x = -baseManMove;
+            if (keys['ArrowRight']) velocity.x = baseManMove;
+            if (keys['ArrowUp']) velocity.y = -baseManMove;
+            if (keys['ArrowDown']) velocity.y = baseManMove;
+
+            // Handle skills
+            if (keys['q']) activateSkillQ();
+            if (keys['w']) activateSkillW();
+            if (keys['e']) activateSkillE();
+            if (keys['r']) activateSkillR();
+        }
+
+        // Move the man smoothly
+        function moveMan() {
+            const manPositionX = man.offsetLeft + velocity.x;
+            const manPositionY = man.offsetTop + velocity.y;
 
             // Check boundaries
             if (manPositionX >= 0 && manPositionX <= gameCanvas.clientWidth - man.clientWidth) {
@@ -192,52 +194,62 @@
             if (manPositionY >= 0 && manPositionY <= gameCanvas.clientHeight - man.clientHeight) {
                 man.style.top = manPositionY + 'px';
             }
+
+            // Request next frame
+            requestAnimationFrame(moveMan);
+        }
+
+
+        // Start the movement logic
+        function startMovement() {
+            moveMan();       // Start moving the man
+            setInterval(updateVelocity, 100); // Update velocity every 5ms
         }
 
         function activateSkillQ() {
-    if (remainingCooldowns.Q === 0) {
-        const shieldSize = 30; // Size of the shield
-        const shield = document.createElement('div');
-        shield.classList.add('shield');
-        shield.style.width = shieldSize + 'px';
-        shield.style.height = shieldSize + 'px';
-        shield.style.left = (man.offsetLeft + (man.clientWidth / 2) - (shieldSize / 2)) + 'px';
-        shield.style.top = (man.offsetTop + (man.clientHeight / 2) - (shieldSize / 2)) + 'px';
-        shield.style.transition = 'transform 1s'; // Add transition for animation
-        shield.style.transform = 'scale(0)'; // Start from scale 0
-
-        gameCanvas.appendChild(shield);
-
-        // Trigger animation
-        setTimeout(() => {
-            shield.style.transform = 'scale(2)'; // Grow the shield
-        }, 10);
-
-        shieldActive = true;
-        startCooldown('Q');
-
-        // Move the shield with the player
-        const moveShield = setInterval(() => {
-            if (shieldActive) {
+            if (remainingCooldowns.Q === 0) {
+                const shieldSize = 30; // Size of the shield
+                const shield = document.createElement('div');
+                shield.classList.add('shield');
+                shield.style.width = shieldSize + 'px';
+                shield.style.height = shieldSize + 'px';
                 shield.style.left = (man.offsetLeft + (man.clientWidth / 2) - (shieldSize / 2)) + 'px';
                 shield.style.top = (man.offsetTop + (man.clientHeight / 2) - (shieldSize / 2)) + 'px';
+                shield.style.transition = 'transform 1s'; // Add transition for animation
+                shield.style.transform = 'scale(0)'; // Start from scale 0
+
+                gameCanvas.appendChild(shield);
+
+                // Trigger animation
+                setTimeout(() => {
+                    shield.style.transform = 'scale(2)'; // Grow the shield
+                }, 10);
+
+                shieldActive = true;
+                startCooldown('Q');
+
+                // Move the shield with the player
+                const moveShield = setInterval(() => {
+                    if (shieldActive) {
+                        shield.style.left = (man.offsetLeft + (man.clientWidth / 2) - (shieldSize / 2)) + 'px';
+                        shield.style.top = (man.offsetTop + (man.clientHeight / 2) - (shieldSize / 2)) + 'px';
+                    }
+                }, 20);
+
+                // Collision detection for bullets
+                const checkCollisionInterval = setInterval(() => {
+                    clearBulletsWithinShield(shield);
+                }, 100); // Check every 100ms
+
+                // Remove the shield after the duration
+                setTimeout(() => {
+                    shieldActive = false;
+                    clearInterval(moveShield);
+                    clearInterval(checkCollisionInterval); // Stop checking for collisions
+                    gameCanvas.removeChild(shield);
+                }, shieldDuration);
             }
-        }, 20);
-
-        // Collision detection for bullets
-        const checkCollisionInterval = setInterval(() => {
-            clearBulletsWithinShield(shield);
-        }, 100); // Check every 100ms
-
-        // Remove the shield after the duration
-        setTimeout(() => {
-            shieldActive = false;
-            clearInterval(moveShield);
-            clearInterval(checkCollisionInterval); // Stop checking for collisions
-            gameCanvas.removeChild(shield);
-        }, shieldDuration);
-    }
-}
+        }
 
         function activateSkillW() {
             if (remainingCooldowns.W === 0) {
@@ -255,54 +267,54 @@
         }
 
         function activateSkillR() {
-    if (remainingCooldowns.R === 0) {
-        const shield = document.createElement('div');
-        shield.classList.add('shield');
-        shield.style.width = '50px';
-        shield.style.height = '50px';
-        shield.style.left = (man.offsetLeft + (man.clientWidth / 2) - 25) + 'px';
-        shield.style.top = (man.offsetTop + (man.clientHeight / 2) - 25) + 'px';
+            if (remainingCooldowns.R === 0) {
+                const shield = document.createElement('div');
+                shield.classList.add('shield');
+                shield.style.width = '50px';
+                shield.style.height = '50px';
+                shield.style.left = (man.offsetLeft + (man.clientWidth / 2) - 25) + 'px';
+                shield.style.top = (man.offsetTop + (man.clientHeight / 2) - 25) + 'px';
 
-        gameCanvas.appendChild(shield);
-        shieldActive = true;
-        startCooldown('R');
+                gameCanvas.appendChild(shield);
+                shieldActive = true;
+                startCooldown('R');
 
-        // Animate the shield to grow
-        setTimeout(() => {
-            shield.style.transform = 'scale(15)'; // Scale to 2x
-        }, 10);
+                // Animate the shield to grow
+                setTimeout(() => {
+                    shield.style.transform = 'scale(15)'; // Scale to 2x
+                }, 10);
 
-        // Clear bullets within the shield after the animation starts
-        const checkCollisionInterval = setInterval(() => {
-            clearBulletsWithinShield(shield);
-        }, 10); // Check every 100ms
+                // Clear bullets within the shield after the animation starts
+                const checkCollisionInterval = setInterval(() => {
+                    clearBulletsWithinShield(shield);
+                }, 10); // Check every 100ms
 
-        // Remove the shield after the duration
-        setTimeout(() => {
-            shieldActive = false;
-            clearInterval(checkCollisionInterval); // Stop checking for collisions
-            gameCanvas.removeChild(shield);
-        }, shieldDuration);
-    }
-}
-
-function clearBulletsWithinShield(shield) {
-    const bullets = document.querySelectorAll('.bullet');
-    const shieldRect = shield.getBoundingClientRect();
-
-    bullets.forEach(bullet => {
-        const bulletRect = bullet.getBoundingClientRect();
-        // Check for collision between bullet and shield
-        if (
-            bulletRect.bottom >= shieldRect.top &&
-            bulletRect.top <= shieldRect.bottom &&
-            bulletRect.right >= shieldRect.left &&
-            bulletRect.left <= shieldRect.right
-        ) {
-            gameCanvas.removeChild(bullet); // Remove bullet from the canvas
+                // Remove the shield after the duration
+                setTimeout(() => {
+                    shieldActive = false;
+                    clearInterval(checkCollisionInterval); // Stop checking for collisions
+                    gameCanvas.removeChild(shield);
+                }, shieldDuration);
+            }
         }
-    });
-}
+
+        function clearBulletsWithinShield(shield) {
+            const bullets = document.querySelectorAll('.bullet');
+            const shieldRect = shield.getBoundingClientRect();
+
+            bullets.forEach(bullet => {
+                const bulletRect = bullet.getBoundingClientRect();
+                // Check for collision between bullet and shield
+                if (
+                    bulletRect.bottom >= shieldRect.top &&
+                    bulletRect.top <= shieldRect.bottom &&
+                    bulletRect.right >= shieldRect.left &&
+                    bulletRect.left <= shieldRect.right
+                ) {
+                    gameCanvas.removeChild(bullet); // Remove bullet from the canvas
+                }
+            });
+        }
 
         function animateHeal() {
             const healDisplay = document.createElement('div');
@@ -502,6 +514,7 @@ function clearBulletsWithinShield(shield) {
 
         async function init() {
             await selectDifficulty();
+            startMovement();
             scoreInterval = setInterval(updateScore, 1000);
             bulletInterval = setInterval(spawnBullets, timeSpawnBullets); // Create bullets based on selected difficulty
         }
