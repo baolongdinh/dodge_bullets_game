@@ -56,9 +56,7 @@
             border-radius: 50%;
             pointer-events: none;
             transform: scale(0);
-            /* Start from scale 0 for animation */
             transition: transform 1s ease;
-            /* Smooth scaling */
         }
 
         #hp {
@@ -134,7 +132,7 @@
         // Cooldown times in seconds
         const cooldownTimes = {
             Q: 25,
-            W: 10,
+            W: 20, // Slow Time skill cooldown
             E: 25,
             R: 50 // Ultimate skill cooldown
         };
@@ -149,6 +147,8 @@
 
         let keys = {};
         const velocity = { x: 0, y: 0 };
+        let slowTimeActive = false;
+        let bulletSpeed = 5;
 
         // Event listeners for keydown and keyup
         document.addEventListener('keydown', (event) => {
@@ -177,7 +177,7 @@
 
             // Handle skills
             if (keys['q']) activateSkillQ();
-            if (keys['w']) activateSkillW();
+            if (keys['w']) activateSkillW(); // Slow Time
             if (keys['e']) activateSkillE();
             if (keys['r']) activateSkillR();
         }
@@ -199,11 +199,10 @@
             requestAnimationFrame(moveMan);
         }
 
-
         // Start the movement logic
         function startMovement() {
             moveMan();       // Start moving the man
-            setInterval(updateVelocity, 100); // Update velocity every 5ms
+            setInterval(updateVelocity, 100); // Update velocity every 100ms
         }
 
         function activateSkillQ() {
@@ -252,9 +251,16 @@
         }
 
         function activateSkillW() {
-            if (remainingCooldowns.W === 0) {
+            if (remainingCooldowns.W === 0 && !slowTimeActive) {
+                slowTimeActive = true;
+                bulletSpeed /= 2; // Slow down bullets
                 startCooldown('W');
-                moveFaster();
+
+                // Resume normal speed after 5 seconds
+                setTimeout(() => {
+                    bulletSpeed *= 2; // Restore bullet speed
+                    slowTimeActive = false;
+                }, 5000); // Duration of slow time
             }
         }
 
@@ -281,13 +287,13 @@
 
                 // Animate the shield to grow
                 setTimeout(() => {
-                    shield.style.transform = 'scale(15)'; // Scale to 2x
+                    shield.style.transform = 'scale(15)'; // Scale to 15x
                 }, 10);
 
                 // Clear bullets within the shield after the animation starts
                 const checkCollisionInterval = setInterval(() => {
                     clearBulletsWithinShield(shield);
-                }, 10); // Check every 100ms
+                }, 10); // Check every 10ms
 
                 // Remove the shield after the duration
                 setTimeout(() => {
@@ -359,13 +365,6 @@
             cooldownDisplay.textContent = `Cooldowns: Q: ${remainingCooldowns.Q}s, W: ${remainingCooldowns.W}s, E: ${remainingCooldowns.E}s, R: ${remainingCooldowns.R}s`;
         }
 
-        function moveFaster() {
-            baseManMove += 50;
-            setTimeout(() => {
-                baseManMove -= 50;
-            }, 10000);
-        }
-
         function heal(amount) {
             hp += amount;
             if (hp > 100) hp = 100; // Max HP cap
@@ -415,16 +414,16 @@
                 let objectPosition;
 
                 if (direction === 'top') {
-                    objectPosition = parseInt(object.style.top) + 5; // Move down
+                    objectPosition = parseInt(object.style.top) + bulletSpeed; // Move down
                     object.style.top = objectPosition + 'px';
                 } else if (direction === 'bottom') {
-                    objectPosition = parseInt(object.style.top) - 5; // Move up
+                    objectPosition = parseInt(object.style.top) - bulletSpeed; // Move up
                     object.style.top = objectPosition + 'px';
                 } else if (direction === 'left') {
-                    objectPosition = parseInt(object.style.left) + 5; // Move right
+                    objectPosition = parseInt(object.style.left) + bulletSpeed; // Move right
                     object.style.left = objectPosition + 'px';
                 } else if (direction === 'right') {
-                    objectPosition = parseInt(object.style.left) - 5; // Move left
+                    objectPosition = parseInt(object.style.left) - bulletSpeed; // Move left
                     object.style.left = objectPosition + 'px';
                 }
 
