@@ -16,19 +16,30 @@
         }
 
         body {
-            overflow: hidden;
-            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            margin: 0;
+            padding: 20px;
+            /* Comfortable padding */
+            background: linear-gradient(135deg, #0f0f1e, #1a1a2e);
+            font-family: 'Rajdhani', sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            /* No scroll */
+            box-sizing: border-box;
         }
 
         #gameCanvas {
-            width: 1600px;
-            height: 1000px;
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            width: calc(100vw - 40px);
+            /* Full width minus padding */
+            max-width: 1600px;
+            /* Max size */
+            height: calc(100vh - 40px);
+            /* Full height minus padding */
+            max-height: 1000px;
+            /* Max size */
+            background: linear-gradient(135deg, #1e1e3a, #1a2540);
             border: 3px solid rgba(100, 255, 218, 0.5);
             border-radius: 15px;
             position: relative;
@@ -42,7 +53,8 @@
             background: radial-gradient(circle, #00ffff, #00d4ff);
             position: absolute;
             border-radius: 50%;
-            box-shadow: 0 0 20px #00ffff;
+            box-shadow: 0 0 25px #00ffff, 0 0 10px #fff;
+            border: 2px solid rgba(255, 255, 255, 0.9);
             z-index: 100;
         }
 
@@ -50,25 +62,28 @@
             position: absolute;
             width: 12px;
             height: 12px;
-            background: radial-gradient(circle, #00d4ff, #0080ff);
+            background: radial-gradient(circle, #00ffff, #00d4ff);
             border-radius: 50%;
-            box-shadow: 0 0 10px #00d4ff;
+            box-shadow: 0 0 15px #00ffff, 0 0 5px #fff;
+            border: 1px solid rgba(255, 255, 255, 0.8);
             z-index: 50;
         }
 
         .bullet {
             position: absolute;
-            background: linear-gradient(135deg, #ff5722, #ff1744);
+            background: radial-gradient(circle, #ff3333, #ff6600);
             border-radius: 50%;
-            box-shadow: 0 0 10px rgba(255, 87, 34, 0.8);
+            box-shadow: 0 0 15px rgba(255, 51, 51, 0.9), 0 0 5px #ff0000;
+            border: 1px solid rgba(255, 0, 0, 0.7);
             z-index: 40;
         }
 
         .heal {
             position: absolute;
-            background: linear-gradient(135deg, #00ffff, #00d4ff);
+            background: radial-gradient(circle, #00ff00, #33ff33);
             border-radius: 50%;
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.9), 0 0 8px #0f0;
+            border: 1px solid rgba(255, 255, 255, 0.6);
             animation: pulse 1s ease-in-out infinite;
             z-index: 40;
         }
@@ -88,6 +103,7 @@
         .enemy {
             position: absolute;
             border-radius: 50%;
+            border: 2px solid rgba(255, 0, 0, 0.6);
             z-index: 60;
         }
 
@@ -262,11 +278,20 @@
         .skill-slot.locked {
             opacity: 0.3;
             border-color: #555;
+            display: none;
+            /* Hide locked skills */
         }
 
         .skill-slot.ready {
             border-color: #4caf50;
             box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            display: flex;
+            /* Show when ready */
+        }
+
+        .skill-slot {
+            transition: all 0.3s ease;
+            /* Smooth transitions */
         }
 
         .skill-level-badge {
@@ -806,6 +831,64 @@
                     <div class="stats-display" id="statsText"></div>
                 </div>
             </div>
+            <!-- Stats Display -->
+            <div id="statsDisplay"></div>
+
+            <!-- Music Toggle Button -->
+            <button id="musicToggle" style="position: absolute; top: 20px; right: 20px;
+                       padding: 10px 15px;
+                       background: rgba(0,0,0,0.7);
+                       border: 2px solid #64ffda;
+                       border-radius: 8px;
+                       color: #64ffda;
+                       font-family: 'Rajdhani', sans-serif;
+                       font-size: 16px;
+                       font-weight: 700;
+                       cursor: pointer;
+                       z-index: 1000;
+                       transition: all 0.3s;">
+                🎵 Music: ON
+            </button>
+
+            <script>
+                // Add click handler after page loads
+                document.addEventListener('DOMContentLoaded', function () {
+                    const musicBtn = document.getElementById('musicToggle');
+                    if (musicBtn) {
+                        musicBtn.addEventListener('click', function () {
+                            console.log('Button clicked!');
+
+                            if (typeof audioSystem === 'undefined' || !audioSystem.bgMusic) {
+                                console.error('Audio system not ready');
+                                return;
+                            }
+
+                            const wasPaused = audioSystem.bgMusic.paused;
+                            console.log('Music was paused:', wasPaused);
+
+                            if (wasPaused) {
+                                // Play music
+                                audioSystem.bgMusic.play()
+                                    .then(() => {
+                                        console.log('✅ Music playing');
+                                        musicBtn.textContent = '🎵 Music: ON';
+                                        musicBtn.style.borderColor = '#64ffda';
+                                        musicBtn.style.color = '#64ffda';
+                                    })
+                                    .catch(e => console.error('Play failed:', e));
+                            } else {
+                                // Pause music
+                                audioSystem.bgMusic.pause();
+                                console.log('✅ Music paused');
+                                musicBtn.textContent = '🔇 Music: OFF';
+                                musicBtn.style.borderColor = '#ff4444';
+                                musicBtn.style.color = '#ff4444';
+                            }
+                        });
+                        console.log('Music toggle button initialized');
+                    }
+                });
+            </script>
             <div class="skills-panel">
                 <div class="skill-slot locked" id="skillQ">
                     <div class="skill-key">Q</div>
@@ -841,6 +924,31 @@
         </div>
     </div>
 
+    <script>
+        // Toggle background music function
+        function toggleBackgroundMusic() {
+            // Make sure audioSystem exists
+            if (typeof audioSystem === 'undefined') {
+                console.error('audioSystem not loaded yet');
+                return;
+            }
+
+            const isPlaying = audioSystem.toggleMusic();
+            const btn = document.getElementById('musicToggle');
+
+            if (isPlaying) {
+                btn.textContent = '🎵 Music: ON';
+                btn.style.borderColor = '#64ffda';
+                btn.style.color = '#64ffda';
+                console.log('Button updated: Music ON');
+            } else {
+                btn.textContent = '🔇 Music: OFF';
+                btn.style.borderColor = '#ff4444';
+                btn.style.color = '#ff4444';
+                console.log('Button updated: Music OFF');
+            }
+        }
+    </script>
     <script src="survivor-game.js"></script>
 </body>
 

@@ -58,6 +58,179 @@ const game = {
     chunkSize: 1600 // Size of each chunk
 };
 
+// ===== AUDIO SYSTEM =====
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+const audioSystem = {
+    enabled: true,
+    volume: 0.2, // Reduced master volume (0.0 to 1.0)
+    musicVolume: 0.08, // Background music volume - 20%
+    lastShootTime: 0,
+    shootThrottle: 100, // Only play shoot sound every 100ms
+    bgMusic: null,
+    bgMusicGain: null,
+
+    // Initialize background music from URL
+    initMusic(url) {
+        if (!url) return;
+
+        try {
+            // Stop and cleanup old music if exists
+            if (this.bgMusic) {
+                this.bgMusic.pause();
+                this.bgMusic = null;
+            }
+
+            // Create new audio element
+            this.bgMusic = new Audio(url);
+            this.bgMusic.loop = true;
+            this.bgMusic.volume = this.musicVolume;
+            // Removed crossOrigin to avoid CORS issues
+
+            console.log('Music initialized:', url);
+        } catch (e) {
+            console.error('Failed to init music:', e);
+        }
+    },
+
+    playMusic() {
+        if (this.bgMusic && this.enabled) {
+            this.bgMusic.play()
+                .then(() => console.log('Music playing'))
+                .catch(e => console.log('Music play failed (click to start):', e));
+        }
+    },
+
+    stopMusic() {
+        if (this.bgMusic) {
+            this.bgMusic.pause();
+            this.bgMusic.currentTime = 0;
+        }
+    },
+
+    toggleMusic() {
+        if (!this.bgMusic) {
+            console.error('No music loaded');
+            return false;
+        }
+
+        console.log('Toggle called. Current paused state:', this.bgMusic.paused);
+
+        // Check if music is currently playing
+        if (this.bgMusic.paused) {
+            // Music is paused, play it
+            console.log('Attempting to play music...');
+            this.bgMusic.play()
+                .then(() => {
+                    console.log('✅ Music resumed successfully');
+                })
+                .catch(e => {
+                    console.error('❌ Music play failed:', e);
+                });
+            return true; // will be playing
+        } else {
+            // Music is playing, pause it
+            console.log('Attempting to pause music...');
+            this.bgMusic.pause();
+            console.log('✅ Music paused successfully');
+            return false; // will be stopped
+        }
+    },
+
+    setMusicVolume(vol) {
+        this.musicVolume = vol;
+        if (this.bgMusic) this.bgMusic.volume = vol;
+    },
+
+    // Procedural sound generation
+    playTone(frequency, duration, type = 'sine', volumeMultiplier = 1) {
+        if (!this.enabled) return;
+
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.value = frequency;
+        oscillator.type = type;
+
+        const vol = this.volume * volumeMultiplier;
+        gainNode.gain.setValueAtTime(vol, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + duration);
+    },
+
+    // Sound effects - OPTIMIZED
+    shoot() {
+        // DISABLED - too spammy, removed completely
+        return;
+    },
+
+    // REMOVED hit() - too spammy, not needed
+
+    enemyHit() {
+        // Only play on critical hits or every few hits
+        if (Math.random() > 0.3) return; // 30% chance to play
+        this.playTone(150, 0.05, 'triangle', 0.12);
+    },
+
+    levelUp() {
+        setTimeout(() => this.playTone(523, 0.15, 'sine', 0.35), 0);
+        setTimeout(() => this.playTone(659, 0.15, 'sine', 0.35), 100);
+        setTimeout(() => this.playTone(784, 0.25, 'sine', 0.4), 200);
+    },
+
+    pickup() {
+        this.playTone(1000, 0.08, 'sine', 0.2);
+        setTimeout(() => this.playTone(1200, 0.08, 'sine', 0.2), 40);
+    },
+
+    skillActivate() {
+        this.playTone(400, 0.12, 'triangle', 0.25);
+        setTimeout(() => this.playTone(600, 0.12, 'triangle', 0.25), 60);
+    },
+
+    hurt() {
+        this.playTone(100, 0.15, 'sawtooth', 0.3);
+    },
+
+    explosion() {
+        // Quieter explosion
+        const bufferSize = audioContext.sampleRate * 0.2;
+        const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+        const output = buffer.getChannelData(0);
+
+        for (let i = 0; i < bufferSize; i++) {
+            output[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = audioContext.createBufferSource();
+        noise.buffer = buffer;
+
+        const noiseGain = audioContext.createGain();
+        noise.connect(noiseGain);
+        noiseGain.connect(audioContext.destination);
+
+        noiseGain.gain.setValueAtTime(this.volume * 0.15, audioContext.currentTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+
+        noise.start();
+    },
+
+    toggleMute() {
+        this.enabled = !this.enabled;
+        if (!this.enabled) {
+            this.stopMusic();
+        } else {
+            this.playMusic();
+        }
+        return this.enabled;
+    }
+};
+
+
 // ===== INIT =====
 function init() {
     game.canvas = document.getElementById('gameCanvas');
@@ -258,6 +431,23 @@ function createObstacles() {
 
 // ===== START GAME =====
 function startGame(difficulty) {
+    // Custom background music from Google Drive
+    const musicUrl = 'https://wise-amethyst-s5n72bi1aq-bwgwy271b4.edgeone.dev/Pixel-Peeker-Polka-faster(chosic.com)%20(1).mp3';
+
+    if (musicUrl) {
+        audioSystem.initMusic(musicUrl);
+
+        // Try to play immediately
+        setTimeout(() => audioSystem.playMusic(), 500);
+
+        // Also add click listener to start music (bypass autoplay restrictions)
+        const playMusicOnClick = () => {
+            audioSystem.playMusic();
+            document.removeEventListener('click', playMusicOnClick);
+        };
+        document.addEventListener('click', playMusicOnClick);
+    }
+
     document.getElementById('startMenu').style.display = 'none';
 
     // Create player
@@ -507,6 +697,7 @@ function autoShoot() {
 }
 
 function shootProjectile(xWorld, yWorld, angle) {
+    audioSystem.shoot(); // Play shoot sound
     const proj = document.createElement('div');
     proj.className = 'projectile projectile-rotating';
     const size = 12 * game.stats.projectileSize;
@@ -613,6 +804,8 @@ function updateProjectiles() {
 function useSkill(key) {
     const skill = game.skills[key];
     if (!skill || skill.level === 0) return;
+
+    audioSystem.skillActivate(); // Play skill sound
 
     // Check passive skills separately
     if (skill.isPassive) {
@@ -1395,7 +1588,10 @@ function createEnemy(type, isElite = false) {
         lastShot: 0,
         worldX: worldX, // Store world coordinates
         worldY: worldY,  // Store world coordinates
-        isElite: isElite || false
+        isElite: isElite || false,
+        // AI behavior tracking
+        behaviorTime: Date.now(),
+        zigzagOffset: Math.random() * Math.PI * 2 // Random start phase for zigzag
     });
 }
 
@@ -1434,6 +1630,33 @@ function updateEnemies() {
         const angle = Math.atan2(py - eyScreen, px - exScreen);
         let vx = Math.cos(angle) * currentSpeed;
         let vy = Math.sin(angle) * currentSpeed;
+
+        // IMPROVED AI BEHAVIORS
+        // Zombie: Zigzag movement
+        if (enemy.type === 'zombie') {
+            const zigzagTime = (Date.now() - enemy.behaviorTime) / 1000;
+            const zigzagAmount = Math.sin(zigzagTime * 3 + enemy.zigzagOffset) * 0.5;
+            const perpAngle = angle + Math.PI / 2;
+            vx += Math.cos(perpAngle) * zigzagAmount * currentSpeed;
+            vy += Math.sin(perpAngle) * zigzagAmount * currentSpeed;
+        }
+
+        // Shooter: Keep distance behavior
+        if (enemy.type === 'shooter') {
+            const optimalRange = 250; // Preferred distance from player
+            if (distToPlayer < optimalRange - 50) {
+                // Too close, move away
+                vx = -vx * 0.8;
+                vy = -vy * 0.8;
+            } else if (distToPlayer < optimalRange + 50) {
+                // In optimal range, strafe
+                const strafeAngle = angle + Math.PI / 2;
+                const strafeDir = Math.sin((Date.now() - enemy.behaviorTime) / 500) > 0 ? 1 : -1;
+                vx = Math.cos(strafeAngle) * currentSpeed * 0.7 * strafeDir;
+                vy = Math.sin(strafeAngle) * currentSpeed * 0.7 * strafeDir;
+            }
+            // Else: too far, chase normally (default vx, vy)
+        }
 
         // Update world position
         let newWorldX = enemy.worldX + vx;
@@ -1492,11 +1715,35 @@ function updateEnemies() {
         enemy.worldX = newWorldX;
         enemy.worldY = newWorldY;
 
-        // Shooter attack
+        // IMPROVED SHOOTER ATTACK with bullet patterns
         if (enemy.type === 'shooter') {
             const now = Date.now();
-            if (now - enemy.lastShot > 2500 && distToPlayer < 400) {
-                shootEnemyBullet(enemy.worldX + enemy.w / 2, enemy.worldY + enemy.h / 2, pxWorld, pyWorld, enemy.damage);
+            const shootCooldown = enemy.isElite ? 2000 : 2500; // Elite shoots faster
+
+            if (now - enemy.lastShot > shootCooldown && distToPlayer < 400) {
+                const centerX = enemy.worldX + enemy.w / 2;
+                const centerY = enemy.worldY + enemy.h / 2;
+                const angleToPlayer = Math.atan2(pyWorld - centerY, pxWorld - centerX);
+
+                if (enemy.isElite) {
+                    // Elite: 5-way spread
+                    for (let i = -2; i <= 2; i++) {
+                        const spreadAngle = angleToPlayer + (i * 0.15);
+                        const targetX = centerX + Math.cos(spreadAngle) * 400;
+                        const targetY = centerY + Math.sin(spreadAngle) * 400;
+                        shootEnemyBullet(centerX, centerY, targetX, targetY, enemy.damage);
+                    }
+                    audioSystem.explosion(); // Special sound for elite
+                } else {
+                    // Normal: Triple shot
+                    for (let i = -1; i <= 1; i++) {
+                        const spreadAngle = angleToPlayer + (i * 0.2);
+                        const targetX = centerX + Math.cos(spreadAngle) * 400;
+                        const targetY = centerY + Math.sin(spreadAngle) * 400;
+                        shootEnemyBullet(centerX, centerY, targetX, targetY, enemy.damage);
+                    }
+                }
+
                 enemy.lastShot = now;
             }
         }
@@ -1505,6 +1752,7 @@ function updateEnemies() {
         if (distToPlayer < 25) {
             const dmg = Math.max(1, enemy.damage - game.stats.armor);
             game.state.hp -= dmg;
+            audioSystem.hurt(); // Play hurt sound
             showFloatingText(px, py, '-' + Math.floor(dmg), '#ff1744');
             updateUI('hp');
 
@@ -1514,6 +1762,8 @@ function updateEnemies() {
 }
 
 function damageEnemy(enemy, damage) {
+    audioSystem.enemyHit(); // Play hit sound
+
     enemy.hp -= damage;
     enemy.hpFill.style.width = ((enemy.hp / enemy.maxHp) * 100) + '%';
 
@@ -1598,6 +1848,8 @@ function updateItems() {
 }
 
 function collectItem(item) {
+    audioSystem.pickup(); // Play pickup sound
+
     const px = game.player.offsetLeft + 15;
     const py = game.player.offsetTop + 15;
 
@@ -1795,6 +2047,7 @@ function updateBullets() {
             } else {
                 const dmg = Math.max(1, bullet.damage - game.stats.armor);
                 game.state.hp -= dmg;
+                audioSystem.hurt(); // Play hurt sound
                 showFloatingText(px + 15, py + 15, '-' + Math.floor(dmg), '#ff1744');
                 updateUI('hp');
 
@@ -1820,6 +2073,8 @@ function gainXP(amount) {
 }
 
 function levelUp() {
+    audioSystem.levelUp(); // Play level up sound
+
     game.state.level++;
     game.state.xp = 0;
     game.state.xpToLevel = Math.floor(game.state.xpToLevel * 1.3);
@@ -1848,38 +2103,187 @@ function showLevelUpMenu() {
     const options = document.getElementById('upgradeOptions');
     options.innerHTML = '';
 
-    const upgrades = [
-        { name: '💥 +15 Damage', fn: () => game.stats.projectileDamage += 15 },
-        { name: '🔫 +1 Projectile', fn: () => game.stats.projectileCount++ },
-        { name: '⚡ +0.8 Fire Rate', fn: () => game.stats.fireRate += 0.8 },
-        { name: '🎯 +1 Pierce', fn: () => game.stats.projectilePierce++ },
-        { name: '❤️ +30 Max HP', fn: () => { game.state.maxHp += 30; game.state.hp += 30; updateUI('hp'); } },
-        { name: '🛡️ +5 Armor', fn: () => game.stats.armor += 5 },
-        { name: '🏃 +1 Speed', fn: () => game.stats.moveSpeed += 1 },
-        { name: '💚 +1 HP/s Regen', fn: () => game.stats.regen++ },
-        { name: '🧲 +20 Pickup Range', fn: () => game.stats.pickupRange += 20 },
-        { name: '💫 +10% Crit Chance', fn: () => game.stats.critChance += 0.1 },
-        { name: '📏 +30% Projectile Size', fn: () => game.stats.projectileSize += 0.3 },
-        { name: '🩸 +5% Lifesteal', fn: () => game.stats.lifesteal += 0.05 },
-        { name: '💥 +10% AOE Radius', fn: () => game.stats.aoeRadius += 0.1 },
-        { name: '⏱️ -5% Cooldown', fn: () => game.stats.cooldownReduction += 0.05 }
-    ];
+    // GUARANTEED SKILL UNLOCKS AT SPECIFIC LEVELS
+    const skillUnlockLevels = {
+        'Q': 2,  // Fireball Barrage
+        'W': 4,  // Spirit Wolves
+        'E': 6,  // Shield Slam
+        'R': 8,  // Black Hole
+        'T': 10, // Phoenix Rebirth
+        'Y': 12  // Critical Overload
+    };
 
-    // Add skill unlocks/upgrades
-    for (let key in game.skills) {
-        const skill = game.skills[key];
-        if (skill.level === 0) {
-            upgrades.push({ name: `🔓 Unlock ${skill.name}`, fn: () => { skill.level = 1; updateSkillUI(key); } });
-        } else if (skill.level < 5) {
-            upgrades.push({ name: `⬆️ ${skill.name} Lv${skill.level + 1}`, fn: () => { skill.level++; updateSkillUI(key); } });
+    // Check if this level should guarantee a skill unlock
+    let guaranteedSkill = null;
+    for (let key in skillUnlockLevels) {
+        if (game.state.level === skillUnlockLevels[key] && game.skills[key].level === 0) {
+            guaranteedSkill = key;
+            break;
         }
     }
 
-    const chosen = upgrades.sort(() => Math.random() - 0.5).slice(0, 3);
+    const upgrades = [
+        {
+            name: '💥 +15 Damage',
+            stat: 'projectileDamage',
+            value: 15,
+            fn: () => game.stats.projectileDamage += 15
+        },
+        {
+            name: '🔫 +1 Projectile',
+            stat: 'projectileCount',
+            value: 1,
+            fn: () => game.stats.projectileCount++
+        },
+        {
+            name: '⚡ +0.8 Fire Rate',
+            stat: 'fireRate',
+            value: 0.8,
+            fn: () => game.stats.fireRate += 0.8
+        },
+        {
+            name: '🎯 +1 Pierce',
+            stat: 'projectilePierce',
+            value: 1,
+            fn: () => game.stats.projectilePierce++
+        },
+        {
+            name: '❤️ +30 Max HP',
+            stat: 'maxHp',
+            value: 30,
+            fn: () => { game.state.maxHp += 30; game.state.hp += 30; updateUI('hp'); }
+        },
+        {
+            name: '🛡️ +5 Armor',
+            stat: 'armor',
+            value: 5,
+            fn: () => game.stats.armor += 5
+        },
+        {
+            name: '🏃 +1 Speed',
+            stat: 'moveSpeed',
+            value: 1,
+            fn: () => game.stats.moveSpeed += 1
+        },
+        {
+            name: '💚 +1 HP/s Regen',
+            stat: 'regen',
+            value: 1,
+            fn: () => game.stats.regen++
+        },
+        {
+            name: '🧲 +20 Pickup Range',
+            stat: 'pickupRange',
+            value: 20,
+            fn: () => game.stats.pickupRange += 20
+        },
+        {
+            name: '💫 +10% Crit Chance',
+            stat: 'critChance',
+            value: 0.1,
+            fn: () => game.stats.critChance += 0.1
+        },
+        {
+            name: '📏 +30% Projectile Size',
+            stat: 'projectileSize',
+            value: 0.3,
+            fn: () => game.stats.projectileSize += 0.3
+        },
+        {
+            name: '🩸 +5% Lifesteal',
+            stat: 'lifesteal',
+            value: 0.05,
+            fn: () => game.stats.lifesteal += 0.05
+        },
+        {
+            name: '💥 +10% AOE Radius',
+            stat: 'aoeRadius',
+            value: 0.1,
+            fn: () => game.stats.aoeRadius += 0.1
+        },
+        {
+            name: '⏱️ -5% Cooldown',
+            stat: 'cooldownReduction',
+            value: 0.05,
+            fn: () => game.stats.cooldownReduction += 0.05
+        }
+    ];
+
+    let chosen = [];
+
+    // If there's a guaranteed skill unlock, force it
+    if (guaranteedSkill) {
+        const skill = game.skills[guaranteedSkill];
+        chosen.push({
+            name: `🔓 Unlock ${skill.name} (${guaranteedSkill})`,
+            isSkill: true,
+            fn: () => {
+                skill.level = 1;
+                updateSkillUI(guaranteedSkill);
+                showFloatingText(800, 400, `✨ ${skill.name} Unlocked! ✨`, '#ffd700');
+            }
+        });
+        // Add 2 more random upgrades
+        const randomUpgrades = upgrades.sort(() => Math.random() - 0.5).slice(0, 2);
+        chosen = chosen.concat(randomUpgrades);
+    } else {
+        // Normal random selection with skill upgrades
+        // Add skill unlocks/upgrades to pool
+        for (let key in game.skills) {
+            const skill = game.skills[key];
+            if (skill.level === 0) {
+                upgrades.push({
+                    name: `🔓 Unlock ${skill.name} (${key})`,
+                    isSkill: true,
+                    fn: () => {
+                        skill.level = 1;
+                        updateSkillUI(key);
+                        showFloatingText(800, 400, `✨ ${skill.name} Unlocked! ✨`, '#ffd700');
+                    }
+                });
+            } else if (skill.level < 5) {
+                upgrades.push({
+                    name: `⬆️ ${skill.name} Lv${skill.level + 1}`,
+                    isSkill: true,
+                    fn: () => {
+                        skill.level++;
+                        updateSkillUI(key);
+                    }
+                });
+            }
+        }
+        chosen = upgrades.sort(() => Math.random() - 0.5).slice(0, 3);
+    }
+
     chosen.forEach(up => {
         const btn = document.createElement('button');
         btn.className = 'btn btn-upgrade';
-        btn.textContent = up.name;
+
+        // Show stat changes for non-skill upgrades
+        if (!up.isSkill && up.stat) {
+            const currentValue = up.stat === 'maxHp' ? game.state.maxHp : game.stats[up.stat];
+            const newValue = currentValue + up.value;
+
+            // Format values nicely
+            const formatValue = (val) => {
+                if (up.stat === 'fireRate' || up.stat === 'critChance' || up.stat === 'lifesteal' ||
+                    up.stat === 'projectileSize' || up.stat === 'aoeRadius' || up.stat === 'cooldownReduction') {
+                    return val.toFixed(1);
+                }
+                return Math.floor(val);
+            };
+
+            btn.innerHTML = `
+                <div style="font-size: 16px; font-weight: 700;">${up.name}</div>
+                <div style="font-size: 13px; color: #64ffda; margin-top: 4px;">
+                    ${formatValue(currentValue)} → ${formatValue(newValue)}
+                    <span style="color: #4caf50;">(+${formatValue(up.value)})</span>
+                </div>
+            `;
+        } else {
+            btn.textContent = up.name;
+        }
+
         btn.onclick = () => {
             up.fn();
             updateStatsDisplay();
@@ -1979,14 +2383,18 @@ function updateSkillUI(key) {
     if (skill.level === 0) {
         slot.classList.add('locked');
         slot.classList.remove('ready');
+        slot.style.display = 'none'; // Hide locked skills
         cd.textContent = '🔒';
-    } else if (skill.remaining > 0) {
-        slot.classList.remove('locked', 'ready');
-        cd.textContent = skill.remaining;
     } else {
-        slot.classList.remove('locked');
-        slot.classList.add('ready');
-        cd.textContent = '';
+        slot.style.display = 'flex'; // Show unlocked skills
+        if (skill.remaining > 0) {
+            slot.classList.remove('locked', 'ready');
+            cd.textContent = skill.remaining;
+        } else {
+            slot.classList.remove('locked');
+            slot.classList.add('ready');
+            cd.textContent = '';
+        }
     }
 }
 
