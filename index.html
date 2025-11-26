@@ -830,6 +830,15 @@
             <div id="upgradeOptions"></div>
         </div>
 
+        <!-- Pause Menu -->
+        <div id="pauseMenu"
+            style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 2000;">
+            <h1 style="font-size: 60px; color: #fff; text-shadow: 0 0 20px #64ffda; margin: 0;">PAUSED</h1>
+            <p style="color: #aaa; margin-top: 10px;">Press 'P' to Resume</p>
+            <button onclick="togglePause()"
+                style="margin-top: 20px; padding: 10px 30px; background: #64ffda; border: none; border-radius: 5px; color: #000; font-weight: bold; cursor: pointer; font-family: 'Rajdhani', sans-serif; font-size: 18px;">RESUME</button>
+        </div>
+
         <div id="hud">
             <div>
                 <div class="stat-panel">

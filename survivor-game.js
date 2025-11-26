@@ -750,11 +750,47 @@ function updateGameTime() {
     }
 
     updateUI('score');
+    updateUI('score');
 }
+
+// ===== PAUSE SYSTEM =====
+function togglePause(forceState = null) {
+    if (game.state.gameOver) return;
+
+    // If forceState is provided, use it, otherwise toggle
+    if (forceState !== null) {
+        game.state.paused = forceState;
+    } else {
+        game.state.paused = !game.state.paused;
+    }
+
+    const pauseMenu = document.getElementById('pauseMenu');
+    if (game.state.paused) {
+        pauseMenu.style.display = 'block';
+        if (audioSystem.bgMusic && !audioSystem.bgMusic.paused) {
+            audioSystem.bgMusic.pause();
+            game.state.wasPlayingMusic = true;
+        }
+    } else {
+        pauseMenu.style.display = 'none';
+        // Resume music if it was playing before pause
+        if (game.state.wasPlayingMusic && audioSystem.bgMusic) {
+            audioSystem.bgMusic.play().catch(e => console.log('Resume failed:', e));
+            game.state.wasPlayingMusic = false;
+        }
+    }
+}
+
+// Auto-pause on tab switch
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        togglePause(true);
+    }
+});
 
 // ===== INPUT =====
 document.addEventListener('keydown', e => {
-    if (e.key === 'p') game.state.paused = !game.state.paused;
+    if (e.key === 'p' || e.key === 'P') togglePause();
     if (!game.state.paused && !game.state.gameOver) {
         game.keys[e.key.toLowerCase()] = true;
     }
