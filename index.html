@@ -32,107 +32,130 @@
 
         #gameCanvas {
             width: calc(100vw - 40px);
-            /* Full width minus padding */
             max-width: 1600px;
-            /* Max size */
             height: calc(100vh - 40px);
-            /* Full height minus padding */
             max-height: 1000px;
-            /* Max size */
-            background: linear-gradient(135deg, #1e1e3a, #1a2540);
-            border: 3px solid rgba(100, 255, 218, 0.5);
+            /* Deep space background with subtle grid */
+            background-color: #0b0b15;
+            background-image:
+                linear-gradient(rgba(100, 255, 218, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(100, 255, 218, 0.03) 1px, transparent 1px),
+                radial-gradient(circle at 50% 50%, rgba(20, 20, 40, 0) 0%, rgba(0, 0, 0, 0.6) 100%);
+            background-size: 40px 40px, 40px 40px, 100% 100%;
+            border: 3px solid rgba(100, 255, 218, 0.3);
             border-radius: 15px;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 0 50px rgba(100, 255, 218, 0.3);
+            box-shadow: 0 0 50px rgba(100, 255, 218, 0.1);
         }
 
         .player {
+            position: absolute;
             width: 30px;
             height: 30px;
-            background: radial-gradient(circle, #00ffff, #00d4ff);
-            position: absolute;
+            /* Neon Cyan Core */
+            background: radial-gradient(circle, #fff, #00ffff);
             border-radius: 50%;
-            box-shadow: 0 0 25px #00ffff, 0 0 10px #fff;
-            border: 2px solid rgba(255, 255, 255, 0.9);
+            /* Heavy Glow */
+            box-shadow:
+                0 0 10px #00ffff,
+                0 0 20px #00ffff,
+                0 0 40px #00ffff;
+            transform: translate(-50%, -50%);
             z-index: 100;
+        }
+
+        /* Add a direction indicator for player */
+        .player::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            border-right: 4px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            box-shadow: 2px 0 5px #00ffff;
         }
 
         .projectile {
             position: absolute;
-            width: 12px;
-            height: 12px;
-            background: radial-gradient(circle, #00ffff, #00d4ff);
+            width: 16px;
+            height: 16px;
+            /* Fireball: Bright Orange/Yellow */
+            background: radial-gradient(circle, #fff, #ffaa00);
             border-radius: 50%;
-            box-shadow: 0 0 15px #00ffff, 0 0 5px #fff;
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            z-index: 50;
+            box-shadow:
+                0 0 10px #ffaa00,
+                0 0 20px #ff4400;
+            transform: translate(-50%, -50%);
+            z-index: 90;
         }
 
         .bullet {
             position: absolute;
-            background: radial-gradient(circle, #ff3333, #ff6600);
+            width: 14px;
+            height: 14px;
+            /* Enemy Bullet: Neon Red/Pink */
+            background: radial-gradient(circle, #fff, #ff0055);
             border-radius: 50%;
-            box-shadow: 0 0 15px rgba(255, 51, 51, 0.9), 0 0 5px #ff0000;
-            border: 1px solid rgba(255, 0, 0, 0.7);
-            z-index: 40;
+            box-shadow:
+                0 0 8px #ff0055,
+                0 0 15px #ff0055;
+            transform: translate(-50%, -50%);
+            z-index: 95;
         }
 
         .heal {
             position: absolute;
-            background: radial-gradient(circle, #00ff00, #33ff33);
+            width: 12px;
+            height: 12px;
+            background: #00ff00;
             border-radius: 50%;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.9), 0 0 8px #0f0;
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            animation: pulse 1s ease-in-out infinite;
-            z-index: 40;
-        }
-
-        @keyframes pulse {
-
-            0%,
-            100% {
-                transform: scale(1);
-            }
-
-            50% {
-                transform: scale(1.1);
-            }
+            box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+            transform: translate(-50%, -50%);
+            z-index: 80;
+            animation: pulse 1s infinite;
         }
 
         .enemy {
             position: absolute;
+            width: 30px;
+            height: 30px;
+            /* Base Enemy: Dark Red with glowing border */
+            background: rgba(50, 0, 0, 0.8);
+            border: 2px solid #ff3333;
+            border-radius: 4px;
+            /* Slightly rounded square */
+            box-shadow: 0 0 10px #ff3333;
+            transform: translate(-50%, -50%);
+            z-index: 90;
+        }
+
+        /* Different enemy types */
+        .enemy[data-type="shooter"] {
+            border-color: #d500f9;
+            /* Purple */
+            box-shadow: 0 0 10px #d500f9;
             border-radius: 50%;
-            border: 2px solid rgba(255, 0, 0, 0.6);
-            z-index: 60;
+            /* Circle */
         }
 
-        .enemy-slime {
-            width: 35px;
-            height: 35px;
-            background: radial-gradient(circle, #76ff03, #64dd17);
-            box-shadow: 0 0 15px #76ff03;
+        .enemy[data-type="shooter_elite"] {
+            border-color: #ff0055;
+            /* Pink/Red */
+            box-shadow: 0 0 15px #ff0055;
+            border-radius: 50%;
+            border-width: 3px;
         }
 
-        .enemy-zombie {
-            width: 40px;
-            height: 40px;
-            background: radial-gradient(circle, #9e9e9e, #616161);
-            box-shadow: 0 0 15px #9e9e9e;
-        }
-
-        .enemy-shooter {
-            width: 38px;
-            height: 38px;
-            background: radial-gradient(circle, #ff6f00, #e65100);
-            box-shadow: 0 0 15px #ff6f00;
-        }
-
-        .enemy-boss {
-            width: 80px;
-            height: 80px;
-            background: radial-gradient(circle, #d500f9, #aa00ff);
-            box-shadow: 0 0 30px #d500f9;
+        .enemy[data-type="fast"] {
+            border-color: #ff9100;
+            /* Orange */
+            box-shadow: 0 0 10px #ff9100;
+            transform: translate(-50%, -50%) rotate(45deg);
+            /* Diamond shape */
         }
 
         .hp-bar-enemy {

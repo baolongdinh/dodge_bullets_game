@@ -667,7 +667,7 @@ function createObstacles() {
 // ===== START GAME =====
 function startGame(difficulty) {
     // Custom background music from Google Drive
-    const musicUrl = 'https://s3.w3s.aioz.network/w3ai-platform-staging/uploads/samples/0bb1deb0-b90d-4e0e-b761-4c6e5d153828/2025/11/26/1764145746-QW2ttLCmGv7XkzUTcc9h7x.mp3?AWSAccessKeyId=FTDUBKT77BV34OBAT5MOGQCPMQ&Signature=X%2FiIYxnoFRcyLjTC%2B38hgrQrlsQ%3D&Expires=2394865746'
+    const musicUrl = 'https://s3.w3s.aioz.network/w3ai-platform-staging/uploads/samples/0bb1deb0-b90d-4e0e-b761-4c6e5d153828/2025/11/26/1764153335-c3tr2vZ8Pda2cUupkWQx3X.mp3?AWSAccessKeyId=FTDUBKT77BV34OBAT5MOGQCPMQ&Signature=Ee3TMOavs0uD2ZbqdADfsqGKUQE%3D&Expires=2394873335'
 
     if (musicUrl) {
         audioSystem.initMusic(musicUrl);
@@ -683,6 +683,53 @@ function startGame(difficulty) {
         document.addEventListener('click', playMusicOnClick);
     }
 
+    // ===== DIFFICULTY CONFIGURATION =====
+    const difficultyConfig = {
+        1: { // Easy
+            name: 'Easy',
+            baseMultiplier: 0.6,
+            startHP: 150,
+            enemySpawnInterval: 3500,
+            bulletSpawnInterval: 2000,
+            eliteSpawnInterval: 90000, // 1.5 minutes
+            scalingRate: 1.25 // Slower scaling
+        },
+        2: { // Normal
+            name: 'Normal',
+            baseMultiplier: 1.0,
+            startHP: 100,
+            enemySpawnInterval: 2500,
+            bulletSpawnInterval: 1500,
+            eliteSpawnInterval: 60000, // 1 minute
+            scalingRate: 1.35 // Default scaling
+        },
+        3: { // Hard
+            name: 'Hard',
+            baseMultiplier: 1.5,
+            startHP: 75,
+            enemySpawnInterval: 2000,
+            bulletSpawnInterval: 1200,
+            eliteSpawnInterval: 45000, // 45 seconds
+            scalingRate: 1.45 // Faster scaling
+        },
+        4: { // Nightmare
+            name: 'Nightmare',
+            baseMultiplier: 2.5,
+            startHP: 50,
+            enemySpawnInterval: 1500,
+            bulletSpawnInterval: 1000,
+            eliteSpawnInterval: 30000, // 30 seconds
+            scalingRate: 1.6 // Much faster scaling
+        }
+    };
+
+    const config = difficultyConfig[difficulty] || difficultyConfig[2];
+
+    // Set initial difficulty multiplier based on selected difficulty
+    game.difficultyMultiplier = config.baseMultiplier;
+    game.difficultyScalingRate = config.scalingRate;
+    game.selectedDifficulty = difficulty;
+
     document.getElementById('startMenu').style.display = 'none';
 
     // Create player
@@ -691,6 +738,11 @@ function startGame(difficulty) {
     game.player.style.left = '785px';
     game.player.style.top = '485px';
     game.canvas.appendChild(game.player);
+
+    // Set starting HP based on difficulty
+    game.state.hp = config.startHP;
+    game.state.maxHp = config.startHP;
+    updateUI('hp');
 
     // Set HUD Best Score
     const best = ScoreManager.getBestScore();
@@ -706,16 +758,16 @@ function startGame(difficulty) {
     setInterval(updateCooldowns, 1000);
     setInterval(updateGameTime, 1000);
 
-    // Spawn loops - faster as difficulty increases
-    setInterval(() => spawnEnemies(), 2500); // Reduced from 3000 to 2500
-    setInterval(() => spawnBullets(), 1500);
+    // Spawn loops - DIFFERENT for each difficulty
+    setInterval(() => spawnEnemies(), config.enemySpawnInterval);
+    setInterval(() => spawnBullets(), config.bulletSpawnInterval);
 
-    // Elite enemy every 60 seconds
+    // Elite enemy spawn rate varies by difficulty
     setInterval(() => {
         if (!game.state.paused && !game.state.gameOver) {
             spawnEliteEnemy();
         }
-    }, 60000);
+    }, config.eliteSpawnInterval);
 
     // Regen
     setInterval(() => {
@@ -739,9 +791,9 @@ function updateGameTime() {
         document.getElementById('hudBestScore').style.textShadow = '0 0 10px #00ff00';
     }
 
-    // Exponential difficulty increase every 30s
+    // Exponential difficulty increase every 30s - rate varies by difficulty
     if (game.state.gameTime % 30 === 0) {
-        game.difficultyMultiplier *= 1.35; // Increased from 1.2 to 1.35 - faster scaling!
+        game.difficultyMultiplier *= (game.difficultyScalingRate || 1.35);
     }
 
     // Random environmental events
@@ -1252,15 +1304,10 @@ function createFireballBarrage(startX, startY, fireballCount, damage, spreadAngl
 
 function createFireball(xWorld, yWorld, angle, damage) {
     const fireball = document.createElement('div');
-    fireball.style.position = 'absolute';
-    fireball.style.width = '20px';
-    fireball.style.height = '20px';
-    fireball.style.borderRadius = '50%';
-    fireball.style.background = 'radial-gradient(circle, #ff6600, #ff0000)';
-    fireball.style.boxShadow = '0 0 15px #ff6600, 0 0 25px #ff3300';
+    fireball.className = 'projectile';
+    // Reset to CSS class defaults
     fireball.style.left = (xWorld - game.camera.x) + 'px';
     fireball.style.top = (yWorld - game.camera.y) + 'px';
-    fireball.style.zIndex = '90';
     game.canvas.appendChild(fireball);
 
     const speed = 12;
@@ -1289,12 +1336,13 @@ function createFireball(xWorld, yWorld, angle, damage) {
         fireball.style.left = screenX + 'px';
         fireball.style.top = screenY + 'px';
 
-        // Add fire trail
+        // Add neon trail
         if (lifetime % 32 < 16) {
-            createParticles(screenX, screenY, 2, 'fire', {
-                speed: 1,
-                lifetime: 400,
-                size: 6
+            createParticles(screenX, screenY, 1, 'fire', {
+                speed: 0.5,
+                lifetime: 300,
+                size: 4,
+                color: '#ffaa00'
             });
         }
 
@@ -1543,12 +1591,14 @@ function executeShieldSlam(distance, damage) {
             return;
         }
 
-        // Move player smoothly
+        // Move player smoothly - UPDATE BOTH camera AND player world position
         const moveX = Math.cos(angle) * stepDistance;
         const moveY = Math.sin(angle) * stepDistance;
 
         game.camera.x += moveX;
         game.camera.y += moveY;
+        game.state.x += moveX; // FIX: Update player world position
+        game.state.y += moveY; // FIX: Update player world position
 
         // Create trail effect at player position
         if (currentStep % 2 === 0) {
@@ -1873,6 +1923,7 @@ function createEnemy(type, isElite = false) {
         hpFill: hpFill,
         frozen: false,
         lastShot: 0,
+        lastMeleeAttack: 0, // Track melee attack cooldown
         worldX: worldX, // Store world coordinates
         worldY: worldY,  // Store world coordinates
         isElite: isElite || false,
@@ -2035,15 +2086,32 @@ function updateEnemies() {
             }
         }
 
-        // Melee damage
+        // Melee damage - with attack speed cooldown
         if (distToPlayer < 25) {
-            const dmg = Math.max(1, enemy.damage - game.stats.armor);
-            game.state.hp -= dmg;
-            audioSystem.hurt(); // Play hurt sound
-            showFloatingText(px, py, '-' + Math.floor(dmg), '#ff1744');
-            updateUI('hp');
+            const now = Date.now();
 
-            if (game.state.hp <= 0 && !checkPhoenixRebirth()) endGame();
+            // Base attack speed: 1 second (1000ms)
+            // Scales with difficulty: faster as game progresses
+            // Min attack speed: 0.4 seconds (400ms) at high difficulty
+            const baseAttackSpeed = 1000; // 1 second
+            const minAttackSpeed = 400; // 0.4 seconds
+            const attackSpeed = Math.max(
+                minAttackSpeed,
+                baseAttackSpeed - (game.difficultyMultiplier * 50)
+            );
+
+            // Check if enough time has passed since last attack
+            if (now - enemy.lastMeleeAttack >= attackSpeed) {
+                const dmg = Math.max(1, enemy.damage - game.stats.armor);
+                game.state.hp -= dmg;
+                audioSystem.hurt(); // Play hurt sound
+                showFloatingText(px, py, '-' + Math.floor(dmg), '#ff1744');
+                updateUI('hp');
+
+                enemy.lastMeleeAttack = now; // Update last attack time
+
+                if (game.state.hp <= 0 && !checkPhoenixRebirth()) endGame();
+            }
         }
     });
 }
@@ -2827,32 +2895,80 @@ function spawnMeteorShower() {
                 clearInterval(updateWarning);
                 if (warning.parentNode) game.canvas.removeChild(warning);
 
-                const explosionScreenX = worldX - game.camera.x + 50;
-                const explosionScreenY = worldY - game.camera.y + 50;
-                createExplosion(explosionScreenX, explosionScreenY, '#ff6600');
+                // Create falling meteor visual
+                const meteor = document.createElement('div');
+                meteor.style.position = 'absolute';
+                meteor.style.width = '30px';
+                meteor.style.height = '30px';
+                meteor.style.borderRadius = '50%';
+                meteor.style.background = 'radial-gradient(circle, #fff, #ff6600)';
+                meteor.style.boxShadow = '0 0 20px #ff6600, 0 0 40px #ff4400, 0 0 60px #ff0000';
+                meteor.style.left = (worldX - game.camera.x + 50) + 'px';
+                meteor.style.top = '-50px'; // Start from top
+                meteor.style.zIndex = '100';
+                game.canvas.appendChild(meteor);
 
-                const damage = 10 + Math.floor(game.difficultyMultiplier * 2);
+                // Animate meteor falling
+                let meteorY = -50;
+                const targetY = worldY - game.camera.y + 50;
+                const fallSpeed = 15;
 
-                // Damage player - use world coordinates
-                const playerX = game.camera.x + 785 + 15;
-                const playerY = game.camera.y + 485 + 15;
-                if (Math.hypot(playerX - (worldX + 50), playerY - (worldY + 50)) < 70) {
-                    game.state.hp -= damage;
-                    showFloatingText(800, 500, '-' + damage + ' ☄️', '#ff6600');
-                    updateUI('hp');
-                    if (game.state.hp <= 0 && !checkPhoenixRebirth()) endGame();
-                }
+                const fallInterval = setInterval(() => {
+                    meteorY += fallSpeed;
+                    meteor.style.top = meteorY + 'px';
 
-                // Damage enemies - use world coordinates
-                game.entities.enemies.forEach(enemy => {
-                    const ex = enemy.worldX + enemy.w / 2;
-                    const ey = enemy.worldY + enemy.h / 2;
-                    if (Math.hypot(ex - (worldX + 50), ey - (worldY + 50)) < 70) {
-                        damageEnemy(enemy, damage * 2);
+                    // Fire trail
+                    if (meteorY % 20 < 10) {
+                        createParticles(
+                            parseFloat(meteor.style.left),
+                            meteorY,
+                            2,
+                            'fire',
+                            { speed: 1, lifetime: 400, size: 8, color: '#ff6600' }
+                        );
                     }
-                });
-            }, 1200);
-        }, i * 300);
+
+                    // Impact
+                    if (meteorY >= targetY) {
+                        clearInterval(fallInterval);
+                        if (meteor.parentNode) game.canvas.removeChild(meteor);
+
+                        const explosionScreenX = worldX - game.camera.x + 50;
+                        const explosionScreenY = worldY - game.camera.y + 50;
+                        createExplosion(explosionScreenX, explosionScreenY, '#ff6600');
+
+                        // Enhanced explosion particles
+                        createParticles(explosionScreenX, explosionScreenY, 20, 'fire', {
+                            speed: 6,
+                            lifetime: 800,
+                            size: 12,
+                            color: '#ff6600'
+                        });
+
+                        const damage = 10 + Math.floor(game.difficultyMultiplier * 2);
+
+                        // Damage player - use world coordinates
+                        const playerX = game.camera.x + 785 + 15;
+                        const playerY = game.camera.y + 485 + 15;
+                        if (Math.hypot(playerX - (worldX + 50), playerY - (worldY + 50)) < 70) {
+                            game.state.hp -= damage;
+                            showFloatingText(800, 500, '-' + damage + ' ☄️', '#ff6600');
+                            updateUI('hp');
+                            if (game.state.hp <= 0 && !checkPhoenixRebirth()) endGame();
+                        }
+
+                        // Damage enemies - use world coordinates
+                        game.entities.enemies.forEach(enemy => {
+                            const ex = enemy.worldX + enemy.w / 2;
+                            const ey = enemy.worldY + enemy.h / 2;
+                            if (Math.hypot(ex - (worldX + 50), ey - (worldY + 50)) < 70) {
+                                damageEnemy(enemy, damage * 2);
+                            }
+                        });
+                    }
+                }, 16); // End fallInterval
+            }, 1200); // End warning timeout
+        }, i * 300); // End meteor spawn delay
     }
 }
 
@@ -2903,19 +3019,60 @@ function spawnLightningStorm() {
                 const screenX = worldX - game.camera.x;
                 const screenY = worldY - game.camera.y;
 
+                // Main lightning bolt (animated zigzag)
                 const lightning = document.createElement('div');
                 lightning.style.position = 'absolute';
                 lightning.style.left = (screenX - 15) + 'px';
                 lightning.style.top = '0px';
                 lightning.style.width = '30px';
                 lightning.style.height = (screenY + 50) + 'px';
-                lightning.style.background = 'linear-gradient(to bottom, #ffeb3b, #ffc107)';
-                lightning.style.boxShadow = '0 0 30px #ffeb3b, 0 0 60px #ffeb3b';
                 lightning.style.pointerEvents = 'none';
                 lightning.style.zIndex = '95';
+                lightning.style.overflow = 'visible';
                 game.canvas.appendChild(lightning);
 
+                // Create branching lightning paths
+                const branches = 3 + Math.floor(Math.random() * 3);
+                for (let b = 0; b < branches; b++) {
+                    const branch = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    branch.style.position = 'absolute';
+                    branch.style.width = '30px';
+                    branch.style.height = (screenY + 50) + 'px';
+                    branch.style.left = '0';
+                    branch.style.top = '0';
+                    branch.style.pointerEvents = 'none';
+                    branch.style.filter = 'drop-shadow(0 0 5px #ffeb3b) drop-shadow(0 0 10px #fff)';
+
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    let d = `M 15 0`; // Start from center top
+                    let currentY = 0;
+                    const segments = 8;
+                    const segmentHeight = (screenY + 50) / segments;
+
+                    for (let s = 0; s < segments; s++) {
+                        currentY += segmentHeight;
+                        const offsetX = 15 + (Math.random() - 0.5) * 20; // Zigzag
+                        d += ` L ${offsetX} ${currentY}`;
+                    }
+
+                    path.setAttribute('d', d);
+                    path.setAttribute('stroke', '#fff');
+                    path.setAttribute('stroke-width', b === 0 ? '3' : '2'); // Main bolt thicker
+                    path.setAttribute('fill', 'none');
+                    path.setAttribute('opacity', b === 0 ? '1' : '0.6');
+
+                    branch.appendChild(path);
+                    lightning.appendChild(branch);
+                }
+
+                // Flash effect
                 createExplosion(screenX, screenY, '#ffeb3b');
+                createParticles(screenX, screenY, 15, 'electric', {
+                    speed: 5,
+                    lifetime: 600,
+                    size: 6,
+                    color: '#ffeb3b'
+                });
 
                 const damage = 15 + Math.floor(game.difficultyMultiplier * 3);
 
