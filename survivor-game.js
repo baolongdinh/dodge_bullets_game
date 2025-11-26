@@ -230,12 +230,247 @@ const audioSystem = {
     }
 };
 
+// ===== SCORE MANAGER =====
+const ScoreManager = {
+    secretKey: 'dbs2024_survivor_game',
+    storageKeys: {
+        BEST_SCORE: 'dbs_best',
+        MATCH_HISTORY: 'dbs_history',
+        CHECKSUM: 'dbs_check'
+    },
+
+    // XOR + Base64 encoding
+    encode(data) {
+        try {
+            const json = JSON.stringify(data);
+            const key = this.secretKey;
+            let encoded = '';
+
+            for (let i = 0; i < json.length; i++) {
+                encoded += String.fromCharCode(
+                    json.charCodeAt(i) ^ key.charCodeAt(i % key.length)
+                );
+            }
+
+            return btoa(encoded);
+        } catch (e) {
+            console.error('Encode failed:', e);
+            return null;
+        }
+    },
+
+    // Decode
+    decode(encoded) {
+        try {
+            const decoded = atob(encoded);
+            const key = this.secretKey;
+            let json = '';
+
+            for (let i = 0; i < decoded.length; i++) {
+                json += String.fromCharCode(
+                    decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length)
+                );
+            }
+
+            return JSON.parse(json);
+        } catch (e) {
+            console.error('Decode failed:', e);
+            return null;
+        }
+    },
+
+    // Generate checksum
+    generateChecksum(data) {
+        const str = JSON.stringify(data);
+        let hash = 0;
+
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash = hash & hash;
+        }
+
+        return hash.toString(36);
+    },
+
+    // Validate data integrity
+    validateData(data, storedChecksum) {
+        const calculatedChecksum = this.generateChecksum(data);
+        return calculatedChecksum === storedChecksum;
+    },
+
+    // Save best score
+    saveBestScore(scoreData) {
+        try {
+            const current = this.getBestScore();
+
+            // Only save if new score is higher
+            if (current && scoreData.score <= current.score) {
+                return false;
+            }
+
+            const data = {
+                score: scoreData.score,
+                level: scoreData.level,
+                time: scoreData.time,
+                difficulty: scoreData.difficulty,
+                date: Date.now()
+            };
+
+            const encoded = this.encode(data);
+            const checksum = this.generateChecksum(data);
+
+            localStorage.setItem(this.storageKeys.BEST_SCORE, encoded);
+            localStorage.setItem(this.storageKeys.CHECKSUM, checksum);
+
+            console.log('✅ New best score saved:', data.score);
+            return true;
+        } catch (e) {
+            console.error('Failed to save best score:', e);
+            return false;
+        }
+    },
+
+    // Get best score
+    getBestScore() {
+        try {
+            const encoded = localStorage.getItem(this.storageKeys.BEST_SCORE);
+            const checksum = localStorage.getItem(this.storageKeys.CHECKSUM);
+
+            if (!encoded || !checksum) return null;
+
+            const data = this.decode(encoded);
+            if (!data) return null;
+
+            // Validate integrity
+            if (!this.validateData(data, checksum)) {
+                console.warn('⚠️ Best score data corrupted, resetting');
+                this.clearBestScore();
+                return null;
+            }
+
+            return data;
+        } catch (e) {
+            console.error('Failed to load best score:', e);
+            return null;
+        }
+    },
+
+    // Clear best score
+    clearBestScore() {
+        localStorage.removeItem(this.storageKeys.BEST_SCORE);
+        localStorage.removeItem(this.storageKeys.CHECKSUM);
+    },
+
+    // Save match to history
+    saveMatch(matchData) {
+        try {
+            const history = this.getMatchHistory() || [];
+
+            const match = {
+                score: matchData.score,
+                level: matchData.level,
+                time: matchData.time,
+                difficulty: matchData.difficulty,
+                date: Date.now()
+            };
+
+            // Add to beginning of array
+            history.unshift(match);
+
+            // Keep only last 10 matches
+            if (history.length > 10) {
+                history.length = 10;
+            }
+
+            const encoded = this.encode(history);
+            localStorage.setItem(this.storageKeys.MATCH_HISTORY, encoded);
+
+            console.log('Match saved to history');
+            return true;
+        } catch (e) {
+            console.error('Failed to save match:', e);
+            return false;
+        }
+    },
+
+    // Get match history
+    getMatchHistory() {
+        try {
+            const encoded = localStorage.getItem(this.storageKeys.MATCH_HISTORY);
+            if (!encoded) return [];
+
+            const data = this.decode(encoded);
+            return data || [];
+        } catch (e) {
+            console.error('Failed to load match history:', e);
+            return [];
+        }
+    },
+
+    // Format time for display
+    formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    },
+
+    // Get difficulty name
+    getDifficultyName(diff) {
+        const names = { 1: 'Easy', 2: 'Normal', 3: 'Hard' };
+        return names[diff] || 'Unknown';
+    }
+};
+
 
 // ===== INIT =====
 function init() {
     game.canvas = document.getElementById('gameCanvas');
     // Don't create static obstacles - will be generated procedurally
     updateAllUI();
+    updateStartMenuScores();
+}
+
+function updateStartMenuScores() {
+    // Update Best Score
+    const best = ScoreManager.getBestScore();
+    const bestContainer = document.getElementById('bestScoreContainer');
+
+    if (best) {
+        bestContainer.style.display = 'block';
+        document.getElementById('bestScoreValue').textContent = best.score.toLocaleString();
+        document.getElementById('bestScoreDetails').textContent =
+            `Level ${best.level} | ${ScoreManager.formatTime(best.time)} | ${ScoreManager.getDifficultyName(best.difficulty)}`;
+    }
+
+    // Update History
+    const history = ScoreManager.getMatchHistory();
+    const historyList = document.getElementById('historyList');
+
+    if (history.length > 0) {
+        historyList.innerHTML = '';
+        history.forEach(match => {
+            const div = document.createElement('div');
+            div.style.padding = '8px';
+            div.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+            div.style.display = 'flex';
+            div.style.justifyContent = 'space-between';
+            div.style.alignItems = 'center';
+
+            const date = new Date(match.date).toLocaleDateString();
+
+            div.innerHTML = `
+                <div>
+                    <div style="color: #fff; font-weight: bold;">${match.score.toLocaleString()}</div>
+                    <div style="font-size: 10px; color: #888;">${date}</div>
+                </div>
+                <div style="text-align: right; font-size: 11px; color: #aaa;">
+                    <div>Lv ${match.level}</div>
+                    <div>${ScoreManager.formatTime(match.time)}</div>
+                </div>
+            `;
+            historyList.appendChild(div);
+        });
+    }
 }
 
 // ===== PROCEDURAL MAP GENERATION =====
@@ -432,7 +667,7 @@ function createObstacles() {
 // ===== START GAME =====
 function startGame(difficulty) {
     // Custom background music from Google Drive
-    const musicUrl = 'https://wise-amethyst-s5n72bi1aq-bwgwy271b4.edgeone.dev/Pixel-Peeker-Polka-faster(chosic.com)%20(1).mp3';
+    const musicUrl = 'https://s3.w3s.aioz.network/w3ai-platform-staging/uploads/samples/0bb1deb0-b90d-4e0e-b761-4c6e5d153828/2025/11/26/1764145746-QW2ttLCmGv7XkzUTcc9h7x.mp3?AWSAccessKeyId=FTDUBKT77BV34OBAT5MOGQCPMQ&Signature=X%2FiIYxnoFRcyLjTC%2B38hgrQrlsQ%3D&Expires=2394865746'
 
     if (musicUrl) {
         audioSystem.initMusic(musicUrl);
@@ -456,6 +691,14 @@ function startGame(difficulty) {
     game.player.style.left = '785px';
     game.player.style.top = '485px';
     game.canvas.appendChild(game.player);
+
+    // Set HUD Best Score
+    const best = ScoreManager.getBestScore();
+    if (best) {
+        document.getElementById('hudBestScore').textContent = best.score.toLocaleString();
+    } else {
+        document.getElementById('hudBestScore').textContent = '0';
+    }
 
     // Start loops
     requestAnimationFrame(gameLoop);
@@ -487,6 +730,14 @@ function updateGameTime() {
     if (game.state.paused || game.state.gameOver) return;
     game.state.gameTime++;
     game.state.score++;
+
+    // Check for high score beat
+    const currentBest = parseInt(document.getElementById('hudBestScore').textContent.replace(/,/g, '')) || 0;
+    if (game.state.score > currentBest) {
+        document.getElementById('hudBestScore').textContent = game.state.score.toLocaleString();
+        document.getElementById('hudBestScore').style.color = '#00ff00'; // Green for beating record
+        document.getElementById('hudBestScore').style.textShadow = '0 0 10px #00ff00';
+    }
 
     // Exponential difficulty increase every 30s
     if (game.state.gameTime % 30 === 0) {
@@ -2465,9 +2716,26 @@ function checkPhoenixRebirth() {
 
 function endGame() {
     game.state.gameOver = true;
+
+    // Save score and history
+    const scoreData = {
+        score: game.state.score,
+        level: game.state.level,
+        time: game.state.gameTime,
+        difficulty: game.difficultyMultiplier
+    };
+
+    const isNewBest = ScoreManager.saveBestScore(scoreData);
+    ScoreManager.saveMatch(scoreData);
+
     const mins = Math.floor(game.state.gameTime / 60);
     const secs = game.state.gameTime % 60;
-    alert(`Game Over!\nLevel: ${game.state.level}\nSurvived: ${mins}:${secs.toString().padStart(2, '0')}`);
+    const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+    let msg = `Game Over!\nLevel: ${game.state.level}\nScore: ${game.state.score}\nSurvived: ${timeStr}`;
+    if (isNewBest) msg += `\n\n🏆 NEW HIGH SCORE!`;
+
+    alert(msg);
     location.reload();
 }
 
