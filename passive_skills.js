@@ -4,6 +4,10 @@
 function updatePassiveSkills() {
     if (game.skills.LIGHTNING_RING.level > 0) updateLightningRing();
     if (game.skills.BLADE_ORBIT.level > 0) updateBladeOrbit();
+    if (game.skills.FIRE_AURA.level > 0) updateFireAura();
+    if (game.skills.ICE_NOVA.level > 0) updateIceNova();
+    if (game.skills.POISON_CLOUD.level > 0) updatePoisonCloud();
+    if (game.skills.HOLY_WATER.level > 0) updateHolyWater();
 }
 
 // ===== LIGHTNING RING ⚡ =====
@@ -362,7 +366,7 @@ function updateFireAura() {
     }
 
     // Generate flame particles around player
-    if (Math.random() < 0.3) { // 30% chance per frame
+    if (Math.random() < 0.5) { // BUFFED: 30% -> 50% chance per frame
         const playerScreenX = 800;
         const playerScreenY = 500;
 
@@ -375,7 +379,7 @@ function updateFireAura() {
         createParticles(x, y, 1, 'fire', {
             speed: 1,
             lifetime: 800,
-            size: 8,
+            size: 12, // BUFFED: 8 -> 12
             color: '#ff6600',
             vx: 0,
             vy: -1 // Float upward

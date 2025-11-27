@@ -809,6 +809,154 @@ body {
     width: 18px;
     height: 18px;
     border-radius: 50%;
+    font-size: 80px;
+    animation: phoenix-rise 2s ease-out forwards;
+}
+
+@keyframes phoenix-rise {
+    0% {
+        transform: translateY(50px) scale(0.5);
+        opacity: 0;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(-100px) scale(1.5);
+        opacity: 0;
+    }
+}
+
+/* Crit Overload Charge */
+.crit-charge {
+    position: absolute;
+    pointer-events: none;
+    z-index: 200;
+    border: 3px solid #ffd700;
+    border-radius: 50%;
+    box-shadow: 0 0 20px #ffd700;
+    animation: charge-pulse 1s ease-in-out infinite;
+}
+
+@keyframes charge-pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.6;
+    }
+
+    50% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+}
+
+/* Enhanced Projectile Rotation */
+.projectile-rotating {
+    animation: projectile-spin 0.5s linear infinite;
+}
+
+@keyframes projectile-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Screen Shake */
+@keyframes screen-shake {
+
+    0%,
+    100% {
+        transform: translate(0, 0);
+    }
+
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+        transform: translate(-5px, -5px);
+    }
+
+    20%,
+    40%,
+    60%,
+    80% {
+        transform: translate(5px, 5px);
+    }
+}
+
+.shake {
+    animation: screen-shake 0.5s ease-in-out;
+}
+
+/* Game Over Modal Styles */
+#gameOverModal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(15, 12, 41, 0.98);
+    border: 3px solid #ff4081;
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    z-index: 600;
+    min-width: 500px;
+    box-shadow: 0 0 50px rgba(255, 64, 129, 0.3);
+    animation: modal-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modal-pop {
+    0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+}
+
+.stat-box {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.go-skill-icon {
+    width: 50px;
+    height: 50px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid #64ffda;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    position: relative;
+}
+
+.go-skill-lvl {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    background: #ffd700;
+    color: #000;
+    font-size: 10px;
+    font-weight: 900;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -840,4 +988,263 @@ body {
         transform: translate(-50%, -50%) scale(1.2);
         opacity: 0.9;
     }
+}
+
+/* ===== PARTICLES ===== */
+.particle {
+    position: absolute;
+    pointer-events: none;
+    border-radius: 50%;
+    z-index: 85;
+    animation: particle-fade 1s ease-out forwards;
+}
+
+@keyframes particle-fade {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: scale(0);
+    }
+}
+
+.particle-fire {
+    background: radial-gradient(circle, #ffeb3b, #ff5722);
+    box-shadow: 0 0 10px #ff5722;
+}
+
+.particle-ice {
+    background: radial-gradient(circle, #fff, #00ffff);
+    box-shadow: 0 0 10px #00ffff;
+}
+
+.particle-poison {
+    background: radial-gradient(circle, #ccff90, #76ff03);
+    box-shadow: 0 0 10px #76ff03;
+}
+
+.particle-electric {
+    background: radial-gradient(circle, #fff, #00ffff);
+    box-shadow: 0 0 10px #00ffff;
+}
+
+.particle-holy {
+    background: radial-gradient(circle, #fff, #ffd700);
+}
+
+@keyframes charge-pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.6;
+    }
+
+    50% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+}
+
+/* Enhanced Projectile Rotation */
+.projectile-rotating {
+    animation: projectile-spin 0.5s linear infinite;
+}
+
+@keyframes projectile-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Screen Shake */
+@keyframes screen-shake {
+
+    0%,
+    100% {
+        transform: translate(0, 0);
+    }
+
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+        transform: translate(-5px, -5px);
+    }
+
+    20%,
+    40%,
+    60%,
+    80% {
+        transform: translate(5px, 5px);
+    }
+}
+
+.shake {
+    animation: screen-shake 0.5s ease-in-out;
+}
+
+/* Game Over Modal Styles */
+#gameOverModal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(15, 12, 41, 0.98);
+    border: 3px solid #ff4081;
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    z-index: 600;
+    min-width: 500px;
+    box-shadow: 0 0 50px rgba(255, 64, 129, 0.3);
+    animation: modal-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modal-pop {
+    0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+}
+
+.stat-box {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.go-skill-icon {
+    width: 50px;
+    height: 50px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid #64ffda;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    position: relative;
+}
+
+.go-skill-lvl {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    background: #ffd700;
+    color: #000;
+    font-size: 10px;
+    font-weight: 900;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Fireball Skill Projectile */
+.projectile-fireball {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    background: radial-gradient(circle, #fff, #ff5722);
+    border-radius: 50%;
+    box-shadow:
+        0 0 15px #ff5722,
+        0 0 30px #ff3d00,
+        0 0 45px #ff9100;
+    transform: translate(-50%, -50%);
+    z-index: 95;
+    animation: fireball-pulse 0.5s infinite alternate;
+}
+
+@keyframes fireball-pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 0.9;
+    }
+}
+
+/* ===== PARTICLES ===== */
+.particle {
+    position: absolute;
+    pointer-events: none;
+    border-radius: 50%;
+    z-index: 85;
+    animation: particle-fade 1s ease-out forwards;
+}
+
+@keyframes particle-fade {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: scale(0);
+    }
+}
+
+.particle-fire {
+    background: radial-gradient(circle, #ffeb3b, #ff5722);
+    box-shadow: 0 0 10px #ff5722;
+}
+
+.particle-ice {
+    background: radial-gradient(circle, #fff, #00ffff);
+    box-shadow: 0 0 10px #00ffff;
+}
+
+.particle-poison {
+    background: radial-gradient(circle, #ccff90, #76ff03);
+    box-shadow: 0 0 10px #76ff03;
+}
+
+.particle-electric {
+    background: radial-gradient(circle, #fff, #00ffff);
+    box-shadow: 0 0 10px #00ffff;
+}
+
+.particle-holy {
+    background: radial-gradient(circle, #fff, #ffd700);
+    box-shadow: 0 0 10px #ffd700;
+}
+
+.particle-spark {
+    background: #fff;
+    box-shadow: 0 0 5px #fff;
+}
+
+/* Condensed Bullet (50+ count) */
+.projectile-condensed {
+    box-shadow: 0 0 15px #d500f9, 0 0 30px #aa00ff !important;
+    background: radial-gradient(circle, #fff, #d500f9) !important;
+}
+
+/* Overload Bullet (100+ count) */
+.projectile-overload {
+    box-shadow: 0 0 20px #ffeb3b, 0 0 40px #ff5722 !important;
+    background: radial-gradient(circle, #fff, #ffeb3b) !important;
+    border: 2px solid #fff;
 }

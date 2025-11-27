@@ -66,15 +66,15 @@ const game = {
             rotation: 0,
             orbitRadius: 250, // BUFFED: 180 -> 250
             bladeCount: 3,
-            damage: 45 // BUFFED: 25 -> 45
+            damage: 25 // BUFFED: 25 -> 45
         },
         fireAura: {
             level: 0,
             active: false,
             burnedEnemies: new Map(),
-            radius: 220, // BUFFED: 140 -> 220
-            damage: 25,  // BUFFED: 10 -> 25
-            tickRate: 200, // BUFFED: 300 -> 200 (Faster)
+            radius: 280, // BUFFED: 220 -> 280
+            damage: 15,  // BUFFED: 10 -> 25
+            tickRate: 300, // BUFFED: 300 -> 200 (Faster)
             burnDOT: 5,
             burnDuration: 2000,
             lastTick: 0
@@ -86,8 +86,8 @@ const game = {
             lastCast: 0,
             cooldown: 5000,
             radius: 250, // BUFFED: 250 -> 350
-            maxRadius: 400, // BUFFED: 400 -> 600
-            damage: 80, // BUFFED: 40 -> 80
+            maxRadius: 280, // BUFFED: 400 -> 600
+            damage: 40, // BUFFED: 40 -> 80
             slow: 0.5,
             slowDuration: 2000
         },
@@ -95,7 +95,7 @@ const game = {
             level: 0,
             active: false,
             poisonedEnemies: new Map(),
-            radius: 240, // BUFFED: 160 -> 240
+            radius: 280, // BUFFED: 160 -> 240
             dot: 20, // BUFFED: 8 -> 20
             lingerDuration: 1000
         },
@@ -107,9 +107,9 @@ const game = {
             dropInterval: 2000,
             puddleCount: 1,
             puddleDuration: 3000,
-            damage: 30, // BUFFED: 12 -> 30
+            damage: 20, // BUFFED: 12 -> 30
             tickRate: 500,
-            puddleSize: 100 // BUFFED: 60 -> 100
+            puddleSize: 85 // BUFFED: 60 -> 100
         }
     },
     entities: {
@@ -757,39 +757,39 @@ function startGame(difficulty) {
     const difficultyConfig = {
         1: { // Easy
             name: 'Easy',
-            baseMultiplier: 0.6,
-            startHP: 150,
+            baseMultiplier: 0.8,
+            startHP: 100,
             enemySpawnInterval: 2300, // 3500/1.5 = faster spawns with AOE skills
             bulletSpawnInterval: 1300, // 2000/1.5
             eliteSpawnInterval: 90000,
-            scalingRate: 1.25
+            scalingRate: 1.2
         },
         2: { // Normal
             name: 'Normal',
-            baseMultiplier: 1.0,
+            baseMultiplier: 1.2,
             startHP: 100,
             enemySpawnInterval: 1700, // 2500/1.5
             bulletSpawnInterval: 1000, // 1500/1.5
             eliteSpawnInterval: 60000,
-            scalingRate: 1.35
+            scalingRate: 1.8
         },
         3: { // Hard
             name: 'Hard',
-            baseMultiplier: 1.5,
-            startHP: 75,
+            baseMultiplier: 1.8,
+            startHP: 100,
             enemySpawnInterval: 1300, // 2000/1.5
             bulletSpawnInterval: 800, // 1200/1.5
             eliteSpawnInterval: 45000,
-            scalingRate: 1.45
+            scalingRate: 2.4
         },
         4: { // Nightmare
             name: 'Nightmare',
             baseMultiplier: 2.5,
-            startHP: 50,
+            startHP: 100,
             enemySpawnInterval: 1000, // 1500/1.5
             bulletSpawnInterval: 670, // 1000/1.5
             eliteSpawnInterval: 30000,
-            scalingRate: 1.6 // Much faster scaling
+            scalingRate: 3.5 // Much faster scaling
         }
     };
 
@@ -827,8 +827,6 @@ function startGame(difficulty) {
     game.stats.regen = 0;
     game.stats.critChance = 0;
     game.stats.critDamage = 1.5;
-    game.stats.lifesteal = 0;
-    game.stats.aoeRadius = 0;
     game.stats.cooldownReduction = 0;
 
     // Reset Skills
@@ -850,7 +848,7 @@ function startGame(difficulty) {
     // Show starting skills notification
     setTimeout(() => {
         showFloatingText(800, 400, `STARTED WITH: Fireball + ${game.skills[randomPassive].name}`, '#64ffda');
-    }, 1000);
+    }, 500);
 
     // Reset Passive States
     for (let key in game.passiveSkills) {
@@ -1151,42 +1149,70 @@ function autoShoot() {
     }
 
     // Shoot multiple projectiles
-    const count = game.stats.projectileCount;
+    const totalCount = game.stats.projectileCount;
+    const VISUAL_CAP = 50;
+
+    let visualCount = totalCount;
+    let damageMult = 1;
+    let sizeMult = 1;
+    let isOverload = false;
+
+    // CONDENSED BULLETS SYSTEM
+    if (totalCount > VISUAL_CAP) {
+        visualCount = VISUAL_CAP;
+        const excess = totalCount - VISUAL_CAP;
+        damageMult = 1 + (excess * 0.05); // +5% Damage per excess bullet
+        sizeMult = 1 + (excess * 0.02);   // +2% Size per excess bullet
+
+        if (totalCount >= 100) {
+            isOverload = true; // Enable Overload Mode (Explosive/Pierce)
+        }
+    }
 
     // Logic: Spread increases with count until it becomes a full circle
     const CIRCLE_THRESHOLD = 12; // At 12 bullets, 12 * 30deg = 360deg -> Full Circle
 
-    if (count >= CIRCLE_THRESHOLD) {
+    if (visualCount >= CIRCLE_THRESHOLD) {
         // Phase 2: Full Circle Mode
         // Distribute evenly around 360 degrees
-        const angleStep = (Math.PI * 2) / count;
-        for (let i = 0; i < count; i++) {
+        const angleStep = (Math.PI * 2) / visualCount;
+        for (let i = 0; i < visualCount; i++) {
             const finalAngle = angle + i * angleStep;
-            shootProjectile(pxWorld, pyWorld, finalAngle);
+            shootProjectile(pxWorld, pyWorld, finalAngle, { damageMult, sizeMult, isOverload });
         }
     } else {
         // Phase 1: Fan Mode
         // Fixed angle per bullet (30 degrees), expanding arc
         const angleStep = 30 * (Math.PI / 180); // 30 degrees in radians
-        const totalSpread = (count - 1) * angleStep;
+        const totalSpread = (visualCount - 1) * angleStep;
 
         // Center the fan around the aim angle
         const startAngle = angle - totalSpread / 2;
 
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < visualCount; i++) {
             const finalAngle = startAngle + i * angleStep;
-            shootProjectile(pxWorld, pyWorld, finalAngle);
+            shootProjectile(pxWorld, pyWorld, finalAngle, { damageMult, sizeMult, isOverload });
         }
     }
 
     game.lastShot = now;
 }
 
-function shootProjectile(xWorld, yWorld, angle) {
+function shootProjectile(xWorld, yWorld, angle, options = {}) {
+    const { damageMult = 1, sizeMult = 1, isOverload = false } = options;
+
     audioSystem.shoot(); // Play shoot sound
     const proj = document.createElement('div');
     proj.className = 'projectile projectile-rotating';
-    const size = 12 * game.stats.projectileSize;
+
+    // Apply visual classes for Condensed/Overload modes
+    if (isOverload) {
+        proj.classList.add('projectile-overload');
+    } else if (damageMult > 1) {
+        proj.classList.add('projectile-condensed');
+    }
+
+    const size = 12 * game.stats.projectileSize * sizeMult;
     proj.style.width = size + 'px';
     proj.style.height = size + 'px';
     proj.style.left = (xWorld - game.camera.x) + 'px'; // Position relative to camera
@@ -1194,7 +1220,7 @@ function shootProjectile(xWorld, yWorld, angle) {
     game.canvas.appendChild(proj);
 
     const isCrit = Math.random() < game.stats.critChance;
-    const damage = game.stats.projectileDamage * (isCrit ? game.stats.critDamage : 1);
+    const damage = game.stats.projectileDamage * (isCrit ? game.stats.critDamage : 1) * damageMult;
 
     // Critical Overload passive - track crits
     if (isCrit && game.skills.Y.level > 0) {
@@ -1214,9 +1240,10 @@ function shootProjectile(xWorld, yWorld, angle) {
         vx: Math.cos(angle) * game.stats.projectileSpeed,
         vy: Math.sin(angle) * game.stats.projectileSpeed,
         damage: damage,
-        pierce: game.stats.projectilePierce,
+        pierce: game.stats.projectilePierce + (isOverload ? 2 : 0), // +2 Pierce in Overload
         hits: 0,
         isCrit: isCrit,
+        isOverload: isOverload, // Store overload state
         angle: angle
     });
 }
@@ -1271,6 +1298,20 @@ function updateProjectiles() {
                 damageEnemy(enemy, proj.damage);
                 if (proj.isCrit) {
                     showFloatingText(exWorld - game.camera.x, eyWorld - game.camera.y, 'CRIT!', '#ffeb3b'); // Text at screen pos
+                }
+
+                // Overload Effect: Explosion & Splash Damage
+                if (proj.isOverload) {
+                    createExplosion(exWorld - game.camera.x, eyWorld - game.camera.y, '#ffeb3b', 80);
+                    // Splash damage to nearby enemies
+                    game.entities.enemies.forEach(e => {
+                        if (e !== enemy) {
+                            const dist = Math.hypot(e.worldX - exWorld, e.worldY - eyWorld);
+                            if (dist < 100) {
+                                damageEnemy(e, proj.damage * 0.3); // 30% splash damage
+                            }
+                        }
+                    });
                 }
 
                 proj.hits++;
@@ -2021,17 +2062,17 @@ function createEnemy(type, isElite = false) {
     game.canvas.appendChild(enemy);
 
     const baseStats = {
-        slime: { hp: 15, speed: 1.5, damage: 1, xp: 8, w: 35, h: 35 },
-        zombie: { hp: 30, speed: 2, damage: 2, xp: 15, w: 40, h: 40 },
-        shooter: { hp: 25, speed: 1, damage: 2, xp: 20, w: 38, h: 38 }
+        slime: { hp: 15, speed: 1.5, damage: 0.5, xp: 8, w: 35, h: 35 },
+        zombie: { hp: 30, speed: 2, damage: 0.8, xp: 15, w: 40, h: 40 },
+        shooter: { hp: 25, speed: 1, damage: 1.2, xp: 20, w: 38, h: 38 }
     }[type];
 
     // Exponential scaling with difficulty - MUCH STRONGER
     let stats = {
         hp: Math.floor(baseStats.hp * Math.pow(game.difficultyMultiplier, 0.8)), // NERFED: 1.5 -> 1.1 (Easier to kill)
         speed: Math.min(baseStats.speed * (1 + game.difficultyMultiplier * 0.12), baseStats.speed * 2.5), // Increased cap
-        damage: Math.floor(baseStats.damage * Math.pow(game.difficultyMultiplier, 0.8)), // NERFED: 1.0 -> 0.8
-        xp: Math.floor(baseStats.xp * Math.pow(game.difficultyMultiplier, 1.2)), // Increased from 0.6
+        damage: Math.floor(baseStats.damage * Math.pow(game.difficultyMultiplier, 0.6)), // NERFED: 1.0 -> 0.8
+        xp: Math.floor(baseStats.xp * Math.pow(game.difficultyMultiplier, 0.8)), // Increased from 0.6
         w: baseStats.w,
         h: baseStats.h
     };
@@ -2292,7 +2333,7 @@ function killEnemy(enemy) {
     // Base drop rate: 35% (increased from 15%)
     // Elite enemies: 75% drop rate
     // Boss-tier enemies would be 100%
-    const baseDropRate = enemy.isElite ? 0.85 : 0.45;
+    const baseDropRate = enemy.isElite ? 0.85 : 0.35;
 
     if (dropRoll < baseDropRate) {
         dropItem(exWorld, eyWorld, enemy.isElite);
@@ -2337,10 +2378,10 @@ function dropItem(xWorld, yWorld, isElite = false) {
     const rarityRoll = Math.random() * 100;
     let tier, type;
 
-    if (isElite && rarityRoll < 2) {
+    if (isElite && rarityRoll < 5) {
         // Epic: 2% from elites only
         tier = DROP_RATES.epic;
-    } else if (rarityRoll < 10) {
+    } else if (rarityRoll < 15) {
         // Rare: 8% normally, 10% from elites
         tier = DROP_RATES.rare;
     } else if (rarityRoll < 30) {
@@ -2414,8 +2455,10 @@ function collectItem(item) {
         game.stats.projectileDamage += 5;
         showFloatingText(px, py, '+5 Damage', '#ff5722');
     } else if (item.type === 'speed') {
-        game.stats.moveSpeed += 0.5;
-        showFloatingText(px, py, '+Speed', '#2196f3');
+        if (game.stats.moveSpeed < 10) {
+            game.stats.moveSpeed += 0.5;
+            showFloatingText(px, py, '+Speed', '#2196f3');
+        }
     } else if (item.type === 'health') {
         game.state.maxHp += 20;
         game.state.hp += 20;
@@ -2442,7 +2485,9 @@ function collectItem(item) {
         // Random 2-3 stat upgrades
         const upgradeCount = 2 + Math.floor(Math.random() * 2);
         game.stats.projectileDamage += 3;
-        game.stats.moveSpeed += 0.3;
+        if (game.stats.moveSpeed < 10) {
+            game.stats.moveSpeed += 0.3;
+        }
         if (upgradeCount === 3) {
             game.stats.projectileCount++;
             showFloatingText(px, py, 'MULTI-BOOST! (+DMG +SPD +PROJ)', '#ff9800');
@@ -2462,9 +2507,9 @@ function collectItem(item) {
             'LIGHTNING_RING': 25,
             'BLADE_ORBIT': 25,
             'FIRE_AURA': 20,
-            'ICE_NOVA': 12,
+            'HOLY_WATER': 12,
             'POISON_CLOUD': 12,
-            'HOLY_WATER': 6
+            'ICE_NOVA': 6
         };
 
         const availableSkills = passiveKeys.filter(key => {
@@ -2860,18 +2905,6 @@ function showLevelUpMenu() {
             fn: () => game.stats.projectileSize += 0.3
         },
         {
-            name: '🩸 +5% Lifesteal',
-            stat: 'lifesteal',
-            value: 0.05,
-            fn: () => game.stats.lifesteal += 0.05
-        },
-        {
-            name: '💥 +10% AOE Radius',
-            stat: 'aoeRadius',
-            value: 0.1,
-            fn: () => game.stats.aoeRadius += 0.1
-        },
-        {
             name: '⏱️ -5% Cooldown',
             stat: 'cooldownReduction',
             value: 0.05,
@@ -2931,9 +2964,10 @@ function showLevelUpMenu() {
     chosen = upgrades.sort(() => Math.random() - 0.5).slice(0, 3);
 
 
-    chosen.forEach(up => {
+    chosen.forEach((up, index) => {
         const btn = document.createElement('button');
         btn.className = 'btn btn-upgrade';
+        btn.setAttribute('data-option-index', index); // Track index for keyboard selection
 
         // Show stat changes for non-skill upgrades
         if (!up.isSkill && up.stat) {
@@ -2950,14 +2984,20 @@ function showLevelUpMenu() {
             };
 
             btn.innerHTML = `
-                <div style="font-size: 16px; font-weight: 700;">${up.name}</div>
+                <div style="font-size: 16px; font-weight: 700;">
+                    <span style="display: inline-block; background: #64ffda; color: #000; padding: 2px 8px; border-radius: 4px; margin-right: 8px; font-size: 14px;">${index + 1}</span>
+                    ${up.name}
+                </div>
                 <div style="font-size: 13px; color: #64ffda; margin-top: 4px;">
                     ${formatValue(currentValue)} → ${formatValue(newValue)}
                     <span style="color: #4caf50;">(+${formatValue(up.value)})</span>
                 </div>
             `;
         } else {
-            btn.textContent = up.name;
+            btn.innerHTML = `
+                <span style="display: inline-block; background: #64ffda; color: #000; padding: 2px 8px; border-radius: 4px; margin-right: 8px; font-size: 14px;">${index + 1}</span>
+                ${up.name}
+            `;
         }
 
         btn.onclick = () => {
@@ -2965,9 +3005,34 @@ function showLevelUpMenu() {
             updateStatsDisplay();
             menu.style.display = 'none';
             game.state.paused = false;
+            // Remove keyboard listener when menu closes
+            document.removeEventListener('keydown', levelUpKeyHandler);
         };
         options.appendChild(btn);
     });
+
+    // Keyboard selection handler
+    const levelUpKeyHandler = (e) => {
+        const key = e.key;
+        let optionIndex = -1;
+
+        // Map keys 1, 2, 3 to option indices 0, 1, 2
+        if (key === '1') optionIndex = 0;
+        else if (key === '2') optionIndex = 1;
+        else if (key === '3') optionIndex = 2;
+
+        if (optionIndex >= 0 && optionIndex < chosen.length) {
+            e.preventDefault();
+            // Trigger the corresponding button click
+            const buttons = options.querySelectorAll('.btn-upgrade');
+            if (buttons[optionIndex]) {
+                buttons[optionIndex].click();
+            }
+        }
+    };
+
+    // Add keyboard listener
+    document.addEventListener('keydown', levelUpKeyHandler);
 
     menu.style.display = 'block';
 }
