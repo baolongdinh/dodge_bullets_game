@@ -813,3 +813,31 @@ body {
     align-items: center;
     justify-content: center;
 }
+
+/* Fireball Skill Projectile */
+.projectile-fireball {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    background: radial-gradient(circle, #fff, #ff5722);
+    border-radius: 50%;
+    box-shadow:
+        0 0 15px #ff5722,
+        0 0 30px #ff3d00,
+        0 0 45px #ff9100;
+    transform: translate(-50%, -50%);
+    z-index: 95;
+    animation: fireball-pulse 0.5s infinite alternate;
+}
+
+@keyframes fireball-pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 0.9;
+    }
+}

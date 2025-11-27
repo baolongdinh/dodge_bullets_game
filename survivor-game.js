@@ -55,26 +55,26 @@ const game = {
             active: false,
             lastTick: 0,
             rings: [],
-            radius: 100,
-            damage: 15,
-            tickRate: 500
+            radius: 250, // BUFFED: 180 -> 250
+            damage: 35,  // BUFFED: 15 -> 35
+            tickRate: 400 // BUFFED: 500 -> 400 (Faster)
         },
         bladeOrbit: {
             level: 0,
             active: false,
             blades: [],
             rotation: 0,
-            orbitRadius: 120,
+            orbitRadius: 250, // BUFFED: 180 -> 250
             bladeCount: 3,
-            damage: 25
+            damage: 45 // BUFFED: 25 -> 45
         },
         fireAura: {
             level: 0,
             active: false,
             burnedEnemies: new Map(),
-            radius: 80,
-            damage: 10,
-            tickRate: 300,
+            radius: 220, // BUFFED: 140 -> 220
+            damage: 25,  // BUFFED: 10 -> 25
+            tickRate: 200, // BUFFED: 300 -> 200 (Faster)
             burnDOT: 5,
             burnDuration: 2000,
             lastTick: 0
@@ -83,10 +83,11 @@ const game = {
             level: 0,
             active: false,
             lastCast: 0,
+            lastCast: 0,
             cooldown: 5000,
-            radius: 150,
-            maxRadius: 300,
-            damage: 40,
+            radius: 350, // BUFFED: 250 -> 350
+            maxRadius: 600, // BUFFED: 400 -> 600
+            damage: 80, // BUFFED: 40 -> 80
             slow: 0.5,
             slowDuration: 2000
         },
@@ -94,8 +95,8 @@ const game = {
             level: 0,
             active: false,
             poisonedEnemies: new Map(),
-            radius: 90,
-            dot: 8,
+            radius: 240, // BUFFED: 160 -> 240
+            dot: 20, // BUFFED: 8 -> 20
             lingerDuration: 1000
         },
         holyWater: {
@@ -106,9 +107,9 @@ const game = {
             dropInterval: 2000,
             puddleCount: 1,
             puddleDuration: 5000,
-            damage: 12,
+            damage: 30, // BUFFED: 12 -> 30
             tickRate: 500,
-            puddleSize: 60
+            puddleSize: 100 // BUFFED: 60 -> 100
         }
     },
     entities: {
@@ -1317,7 +1318,7 @@ function useSkill(key) {
     if (key === 'Q') {
         // 🔥 FIREBALL BARRAGE
         const fireballCount = 5 + skill.level * 2;
-        const damage = 30 + skill.level * 15;
+        const damage = 50 + skill.level * 25; // BUFFED: Base 50, +25 per level
         const spreadAngle = Math.PI / 3; // 60 degrees spread
 
         createFireballBarrage(pxWorld, pyWorld, fireballCount, damage, spreadAngle);
@@ -1450,7 +1451,7 @@ function createFireballBarrage(startX, startY, fireballCount, damage, spreadAngl
 
 function createFireball(xWorld, yWorld, angle, damage) {
     const fireball = document.createElement('div');
-    fireball.className = 'projectile';
+    fireball.className = 'projectile-fireball';
     // Reset to CSS class defaults
     fireball.style.left = (xWorld - game.camera.x) + 'px';
     fireball.style.top = (yWorld - game.camera.y) + 'px';
@@ -2027,10 +2028,10 @@ function createEnemy(type, isElite = false) {
 
     // Exponential scaling with difficulty - MUCH STRONGER
     let stats = {
-        hp: Math.floor(baseStats.hp * Math.pow(game.difficultyMultiplier, 1.5)), // Increased from 1.2
-        speed: Math.min(baseStats.speed * (1 + game.difficultyMultiplier * 0.15), baseStats.speed * 2.5), // Increased cap
-        damage: Math.floor(baseStats.damage * Math.pow(game.difficultyMultiplier, 1.0)), // Increased from 0.8
-        xp: Math.floor(baseStats.xp * Math.pow(game.difficultyMultiplier, 0.7)), // Increased from 0.6
+        hp: Math.floor(baseStats.hp * Math.pow(game.difficultyMultiplier, 0.6)), // NERFED: 1.5 -> 1.1 (Easier to kill)
+        speed: Math.min(baseStats.speed * (1 + game.difficultyMultiplier * 0.12), baseStats.speed * 2.5), // Increased cap
+        damage: Math.floor(baseStats.damage * Math.pow(game.difficultyMultiplier, 0.6)), // NERFED: 1.0 -> 0.8
+        xp: Math.floor(baseStats.xp * Math.pow(game.difficultyMultiplier, 1.2)), // Increased from 0.6
         w: baseStats.w,
         h: baseStats.h
     };
