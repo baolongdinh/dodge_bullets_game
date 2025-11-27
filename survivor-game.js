@@ -36,11 +36,80 @@ const game = {
         E: { level: 0, cd: 8, remaining: 0, name: 'Shield Slam' },
         R: { level: 0, cd: 30, remaining: 0, name: 'Black Hole' },
         T: { level: 0, cd: 120, remaining: 0, name: 'Phoenix Rebirth', isPassive: true },
-        Y: { level: 0, critCounter: 0, threshold: 20, name: 'Critical Overload', isPassive: true }
+        Y: { level: 0, critCounter: 0, threshold: 20, name: 'Critical Overload', isPassive: true },
+        // Passive AOE Skills
+        LIGHTNING_RING: { level: 0, name: '⚡ Lightning Ring', isPassive: true, maxLevel: 9 },
+        BLADE_ORBIT: { level: 0, name: '🌀 Blade Orbit', isPassive: true, maxLevel: 9 },
+        FIRE_AURA: { level: 0, name: '🔥 Fire Aura', isPassive: true, maxLevel: 9 },
+        ICE_NOVA: { level: 0, name: '❄️ Ice Nova', isPassive: true, maxLevel: 9 },
+        POISON_CLOUD: { level: 0, name: '☠️ Poison Cloud', isPassive: true, maxLevel: 9 },
+        HOLY_WATER: { level: 0, name: '🌟 Holy Water', isPassive: true, maxLevel: 9 }
     },
     passives: {
         phoenixReady: true,
         critOverloadCharge: 0
+    },
+    passiveSkills: {
+        lightningRing: {
+            level: 0,
+            active: false,
+            lastTick: 0,
+            rings: [],
+            radius: 100,
+            damage: 15,
+            tickRate: 500
+        },
+        bladeOrbit: {
+            level: 0,
+            active: false,
+            blades: [],
+            rotation: 0,
+            orbitRadius: 120,
+            bladeCount: 3,
+            damage: 25
+        },
+        fireAura: {
+            level: 0,
+            active: false,
+            burnedEnemies: new Map(),
+            radius: 80,
+            damage: 10,
+            tickRate: 300,
+            burnDOT: 5,
+            burnDuration: 2000,
+            lastTick: 0
+        },
+        iceNova: {
+            level: 0,
+            active: false,
+            lastCast: 0,
+            cooldown: 5000,
+            radius: 150,
+            maxRadius: 300,
+            damage: 40,
+            slow: 0.5,
+            slowDuration: 2000
+        },
+        poisonCloud: {
+            level: 0,
+            active: false,
+            poisonedEnemies: new Map(),
+            radius: 90,
+            dot: 8,
+            lingerDuration: 1000
+        },
+        holyWater: {
+            level: 0,
+            active: false,
+            puddles: [],
+            lastDrop: 0,
+            dropInterval: 2000,
+            puddleCount: 1,
+            puddleDuration: 5000,
+            damage: 12,
+            tickRate: 500,
+            puddleSize: 60
+        }
     },
     entities: {
         projectiles: [],
@@ -689,36 +758,36 @@ function startGame(difficulty) {
             name: 'Easy',
             baseMultiplier: 0.6,
             startHP: 150,
-            enemySpawnInterval: 3500,
-            bulletSpawnInterval: 2000,
-            eliteSpawnInterval: 90000, // 1.5 minutes
-            scalingRate: 1.25 // Slower scaling
+            enemySpawnInterval: 2300, // 3500/1.5 = faster spawns with AOE skills
+            bulletSpawnInterval: 1300, // 2000/1.5
+            eliteSpawnInterval: 90000,
+            scalingRate: 1.25
         },
         2: { // Normal
             name: 'Normal',
             baseMultiplier: 1.0,
             startHP: 100,
-            enemySpawnInterval: 2500,
-            bulletSpawnInterval: 1500,
-            eliteSpawnInterval: 60000, // 1 minute
-            scalingRate: 1.35 // Default scaling
+            enemySpawnInterval: 1700, // 2500/1.5
+            bulletSpawnInterval: 1000, // 1500/1.5
+            eliteSpawnInterval: 60000,
+            scalingRate: 1.35
         },
         3: { // Hard
             name: 'Hard',
             baseMultiplier: 1.5,
             startHP: 75,
-            enemySpawnInterval: 2000,
-            bulletSpawnInterval: 1200,
-            eliteSpawnInterval: 45000, // 45 seconds
-            scalingRate: 1.45 // Faster scaling
+            enemySpawnInterval: 1300, // 2000/1.5
+            bulletSpawnInterval: 800, // 1200/1.5
+            eliteSpawnInterval: 45000,
+            scalingRate: 1.45
         },
         4: { // Nightmare
             name: 'Nightmare',
             baseMultiplier: 2.5,
             startHP: 50,
-            enemySpawnInterval: 1500,
-            bulletSpawnInterval: 1000,
-            eliteSpawnInterval: 30000, // 30 seconds
+            enemySpawnInterval: 1000, // 1500/1.5
+            bulletSpawnInterval: 670, // 1000/1.5
+            eliteSpawnInterval: 30000,
             scalingRate: 1.6 // Much faster scaling
         }
     };
@@ -743,6 +812,57 @@ function startGame(difficulty) {
     game.state.hp = config.startHP;
     game.state.maxHp = config.startHP;
     updateUI('hp');
+
+    // Reset Stats & Apply Buffs
+    game.stats.moveSpeed = 5;
+    game.stats.projectileCount = 1;
+    game.stats.projectileDamage = 10;
+    game.stats.projectileSpeed = 10;
+    game.stats.projectilePierce = 0;
+    game.stats.projectileSize = 1;
+    game.stats.fireRate = 2;
+    game.stats.pickupRange = 250; // BUFFED: 5x range (was 50)
+    game.stats.armor = 0;
+    game.stats.regen = 0;
+    game.stats.critChance = 0;
+    game.stats.critDamage = 1.5;
+    game.stats.lifesteal = 0;
+    game.stats.aoeRadius = 0;
+    game.stats.cooldownReduction = 0;
+
+    // Reset Skills
+    for (let key in game.skills) {
+        game.skills[key].level = 0;
+        game.skills[key].remaining = 0;
+        if (game.skills[key].critCounter) game.skills[key].critCounter = 0;
+    }
+
+    // STARTING BUFFS: Grant Q Lv1 + 1 Random Passive
+    game.skills.Q.level = 1;
+    updateSkillUI('Q');
+
+    const passiveKeys = ['LIGHTNING_RING', 'BLADE_ORBIT', 'FIRE_AURA', 'ICE_NOVA', 'POISON_CLOUD', 'HOLY_WATER'];
+    const randomPassive = passiveKeys[Math.floor(Math.random() * passiveKeys.length)];
+    game.skills[randomPassive].level = 1;
+    updateSkillUI(randomPassive);
+
+    // Show starting skills notification
+    setTimeout(() => {
+        showFloatingText(800, 400, `STARTED WITH: Fireball + ${game.skills[randomPassive].name}`, '#64ffda');
+    }, 1000);
+
+    // Reset Passive States
+    for (let key in game.passiveSkills) {
+        const skill = game.passiveSkills[key];
+        skill.level = 0;
+        skill.active = false;
+        skill.lastTick = 0;
+        if (skill.rings) skill.rings = [];
+        if (skill.blades) skill.blades = [];
+        if (skill.burnedEnemies) skill.burnedEnemies = new Map();
+        if (skill.poisonedEnemies) skill.poisonedEnemies = new Map();
+        if (skill.puddles) skill.puddles = [];
+    }
 
     // Set HUD Best Score
     const best = ScoreManager.getBestScore();
@@ -791,9 +911,14 @@ function updateGameTime() {
         document.getElementById('hudBestScore').style.textShadow = '0 0 10px #00ff00';
     }
 
-    // Exponential difficulty increase every 30s - rate varies by difficulty
+    // Difficulty increase every 30s - REDUCED scaling to prevent exponential spike
+    // Changed to additive + small multiplicative for smoother progression
     if (game.state.gameTime % 30 === 0) {
-        game.difficultyMultiplier *= (game.difficultyScalingRate || 1.35);
+        const scalingRate = game.difficultyScalingRate || 1.35;
+        // Hybrid scaling: 70% additive, 30% multiplicative
+        const additiveComponent = game.difficultyMultiplier * 0.2;
+        const multiplicativeComponent = game.difficultyMultiplier * (scalingRate - 1) * 0.3;
+        game.difficultyMultiplier += additiveComponent + multiplicativeComponent;
     }
 
     // Random environmental events
@@ -835,8 +960,9 @@ function togglePause(forceState = null) {
 
 // Auto-pause on tab switch
 document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-        togglePause(true);
+    // Only auto-pause if game is actually running (not on start screen, not already paused)
+    if (document.hidden && game.player && !game.state.paused && !game.state.gameOver) {
+        togglePause();
     }
 });
 
@@ -879,6 +1005,7 @@ function gameLoop() {
         updateBullets();
         updateEnemies();
         updateItems();
+        updatePassiveSkills(); // Update AOE passive skills
     }
     requestAnimationFrame(gameLoop);
 }
@@ -1024,12 +1151,31 @@ function autoShoot() {
 
     // Shoot multiple projectiles
     const count = game.stats.projectileCount;
-    const spread = count > 1 ? 0.3 : 0;
 
-    for (let i = 0; i < count; i++) {
-        const offset = count === 1 ? 0 : (i - (count - 1) / 2) * spread / (count - 1);
-        const finalAngle = angle + offset;
-        shootProjectile(pxWorld, pyWorld, finalAngle);
+    // Logic: Spread increases with count until it becomes a full circle
+    const CIRCLE_THRESHOLD = 12; // At 12 bullets, 12 * 30deg = 360deg -> Full Circle
+
+    if (count >= CIRCLE_THRESHOLD) {
+        // Phase 2: Full Circle Mode
+        // Distribute evenly around 360 degrees
+        const angleStep = (Math.PI * 2) / count;
+        for (let i = 0; i < count; i++) {
+            const finalAngle = angle + i * angleStep;
+            shootProjectile(pxWorld, pyWorld, finalAngle);
+        }
+    } else {
+        // Phase 1: Fan Mode
+        // Fixed angle per bullet (30 degrees), expanding arc
+        const angleStep = 30 * (Math.PI / 180); // 30 degrees in radians
+        const totalSpread = (count - 1) * angleStep;
+
+        // Center the fan around the aim angle
+        const startAngle = angle - totalSpread / 2;
+
+        for (let i = 0; i < count; i++) {
+            const finalAngle = startAngle + i * angleStep;
+            shootProjectile(pxWorld, pyWorld, finalAngle);
+        }
     }
 
     game.lastShot = now;
@@ -2086,7 +2232,7 @@ function updateEnemies() {
             }
         }
 
-        // Melee damage - with attack speed cooldown
+        // Melee damage - instant on first contact, then cooldown
         if (distToPlayer < 25) {
             const now = Date.now();
 
@@ -2100,8 +2246,10 @@ function updateEnemies() {
                 baseAttackSpeed - (game.difficultyMultiplier * 50)
             );
 
-            // Check if enough time has passed since last attack
-            if (now - enemy.lastMeleeAttack >= attackSpeed) {
+            // Allow instant damage if never attacked, or if cooldown expired
+            const canAttack = enemy.lastMeleeAttack === 0 || (now - enemy.lastMeleeAttack >= attackSpeed);
+
+            if (canAttack) {
                 const dmg = Math.max(1, enemy.damage - game.stats.armor);
                 game.state.hp -= dmg;
                 audioSystem.hurt(); // Play hurt sound
@@ -2137,9 +2285,16 @@ function killEnemy(enemy) {
     createExplosion(exScreen, eyScreen, '#76ff03');
     gainXP(enemy.xp);
 
-    // Drop item at world position
-    if (Math.random() < 0.15) {
-        dropItem(exWorld, eyWorld);
+    // Enhanced drop system - much higher rates for better player scaling
+    const dropRoll = Math.random();
+
+    // Base drop rate: 35% (increased from 15%)
+    // Elite enemies: 75% drop rate
+    // Boss-tier enemies would be 100%
+    const baseDropRate = enemy.isElite ? 0.85 : 0.45;
+
+    if (dropRoll < baseDropRate) {
+        dropItem(exWorld, eyWorld, enemy.isElite);
     }
 
     game.canvas.removeChild(enemy.el);
@@ -2148,20 +2303,66 @@ function killEnemy(enemy) {
 }
 
 // ===== ITEMS =====
-function dropItem(xWorld, yWorld) {
+// Configurable drop rate system
+const DROP_RATES = {
+    // Common drops (70%)
+    common: [
+        { name: 'health', weight: 40, color: '#4caf50', icon: '❤️' },
+        { name: 'xp_small', weight: 30, color: '#00bcd4', icon: '🔵' }
+    ],
+    // Uncommon drops (20%)
+    uncommon: [
+        { name: 'damage', weight: 35, color: '#ff5722', icon: '💥' },
+        { name: 'speed', weight: 35, color: '#2196f3', icon: '⚡' },
+        { name: 'projectile', weight: 30, color: '#9c27b0', icon: '🔫' }
+    ],
+    // Rare drops (8%)
+    rare: [
+        { name: 'xp_large', weight: 40, color: '#ffd700', icon: '⭐' },
+        { name: 'multi_stat', weight: 40, color: '#ff9800', icon: '📦' },
+        { name: 'skill_scroll', weight: 20, color: '#e91e63', icon: '📜' }
+    ],
+    // Epic drops (2%) - Elite only
+    epic: [
+        { name: 'skill_scroll', weight: 100, color: '#e91e63', icon: '📜' }
+    ]
+};
+
+function dropItem(xWorld, yWorld, isElite = false) {
     const item = document.createElement('div');
     item.className = 'item-drop';
 
-    const types = [
-        { name: 'damage', color: '#ff5722', icon: '💥' },
-        { name: 'speed', color: '#2196f3', icon: '⚡' },
-        { name: 'health', color: '#4caf50', icon: '❤️' },
-        { name: 'projectile', color: '#9c27b0', icon: '🔫' },
-        { name: 'rare', color: '#ffd700', icon: '⭐' }
-    ];
+    // Determine rarity tier
+    const rarityRoll = Math.random() * 100;
+    let tier, type;
 
-    const rarity = Math.random();
-    const type = rarity > 0.9 ? types[4] : types[Math.floor(Math.random() * 4)];
+    if (isElite && rarityRoll < 2) {
+        // Epic: 2% from elites only
+        tier = DROP_RATES.epic;
+    } else if (rarityRoll < 10) {
+        // Rare: 8% normally, 10% from elites
+        tier = DROP_RATES.rare;
+    } else if (rarityRoll < 30) {
+        // Uncommon: 20%
+        tier = DROP_RATES.uncommon;
+    } else {
+        // Common: 70%
+        tier = DROP_RATES.common;
+    }
+
+    // Weighted random selection within tier
+    const totalWeight = tier.reduce((sum, item) => sum + item.weight, 0);
+    let random = Math.random() * totalWeight;
+
+    for (const itemType of tier) {
+        random -= itemType.weight;
+        if (random <= 0) {
+            type = itemType;
+            break;
+        }
+    }
+
+    if (!type) type = tier[0]; // Fallback
 
     item.style.background = type.color;
     item.textContent = type.icon;
@@ -2226,6 +2427,88 @@ function collectItem(item) {
         game.stats.fireRate += 0.3;
         game.stats.projectilePierce++;
         showFloatingText(px, py, 'RARE UPGRADE!', '#ffd700');
+    }
+    // New item types
+    else if (item.type === 'xp_small') {
+        const xpAmount = 20;
+        gainXP(xpAmount);
+        showFloatingText(px, py, `+${xpAmount} XP`, '#00bcd4');
+    } else if (item.type === 'xp_large') {
+        const xpAmount = 100;
+        gainXP(xpAmount);
+        showFloatingText(px, py, `+${xpAmount} XP!`, '#ffd700');
+    } else if (item.type === 'multi_stat') {
+        // Random 2-3 stat upgrades
+        const upgradeCount = 2 + Math.floor(Math.random() * 2);
+        game.stats.projectileDamage += 3;
+        game.stats.moveSpeed += 0.3;
+        if (upgradeCount === 3) {
+            game.stats.projectileCount++;
+            showFloatingText(px, py, 'MULTI-BOOST! (+DMG +SPD +PROJ)', '#ff9800');
+        } else {
+            showFloatingText(px, py, 'MULTI-BOOST! (+DMG +SPD)', '#ff9800');
+        }
+    } else if (item.type === 'skill_scroll') {
+        // Find all passive skills that are not maxed out
+        const passiveKeys = ['LIGHTNING_RING', 'BLADE_ORBIT', 'FIRE_AURA', 'ICE_NOVA', 'POISON_CLOUD', 'HOLY_WATER'];
+
+        // Define weights for each skill (Higher = more common)
+        // Lightning/Blade: Common (25)
+        // Fire: Uncommon (20)
+        // Ice/Poison: Rare (12)
+        // Holy Water: Epic (6)
+        const skillWeights = {
+            'LIGHTNING_RING': 25,
+            'BLADE_ORBIT': 25,
+            'FIRE_AURA': 20,
+            'ICE_NOVA': 12,
+            'POISON_CLOUD': 12,
+            'HOLY_WATER': 6
+        };
+
+        const availableSkills = passiveKeys.filter(key => {
+            const skill = game.skills[key];
+            return skill.level < (skill.maxLevel || 9);
+        });
+
+        if (availableSkills.length > 0) {
+            // Calculate total weight of available skills
+            const totalWeight = availableSkills.reduce((sum, key) => sum + skillWeights[key], 0);
+            let random = Math.random() * totalWeight;
+            let selectedKey = availableSkills[0];
+
+            // Weighted random selection
+            for (const key of availableSkills) {
+                random -= skillWeights[key];
+                if (random <= 0) {
+                    selectedKey = key;
+                    break;
+                }
+            }
+
+            const skill = game.skills[selectedKey];
+
+            skill.level++;
+            updateSkillUI(selectedKey);
+
+            // Visual feedback
+            const action = skill.level === 1 ? 'Unlocked!' : 'Upgraded!';
+            // Color based on rarity/weight
+            let color = '#ffffff';
+            if (skillWeights[selectedKey] >= 25) color = '#64ffda'; // Common (Cyan)
+            else if (skillWeights[selectedKey] >= 20) color = '#ff9800'; // Uncommon (Orange)
+            else if (skillWeights[selectedKey] >= 12) color = '#e91e63'; // Rare (Pink)
+            else color = '#ffd700'; // Epic (Gold)
+
+            showFloatingText(px, py, `📜 ${skill.name} ${action} (Lv${skill.level})`, color);
+
+            // Also play level up sound for effect
+            audioSystem.levelUp();
+        } else {
+            // Fallback if all skills maxed: Huge XP
+            gainXP(500);
+            showFloatingText(px, py, '📜 ALL SKILLS MAXED! +500 XP', '#e91e63');
+        }
     }
 
     updateStatsDisplay();
@@ -2465,7 +2748,14 @@ function showLevelUpMenu() {
         'E': 6,  // Shield Slam
         'R': 8,  // Black Hole
         'T': 10, // Phoenix Rebirth
-        'Y': 12  // Critical Overload
+        'Y': 12, // Critical Overload
+        // Passive AOE Skills (appear randomly after unlock level)
+        'LIGHTNING_RING': 3,  // Available from level 3+
+        'BLADE_ORBIT': 5,     // Available from level 5+
+        'FIRE_AURA': 7,       // Available from level 7+
+        'ICE_NOVA': 9,        // Available from level 9+
+        'POISON_CLOUD': 11,   // Available from level 11+
+        'HOLY_WATER': 13      // Available from level 13+
     };
 
     // Check if this level should guarantee a skill unlock
@@ -2582,13 +2872,18 @@ function showLevelUpMenu() {
         const randomUpgrades = upgrades.sort(() => Math.random() - 0.5).slice(0, 2);
         chosen = chosen.concat(randomUpgrades);
     } else {
-        // Normal random selection with skill upgrades
         // Add skill unlocks/upgrades to pool
         for (let key in game.skills) {
             const skill = game.skills[key];
+            const unlockLevel = skillUnlockLevels[key] || 1;
+            const maxLevel = skill.maxLevel || 5;
+
+            // Only show AOE skills if player reached unlock level
+            if (game.state.level < unlockLevel) continue;
+
             if (skill.level === 0) {
                 upgrades.push({
-                    name: `🔓 Unlock ${skill.name} (${key})`,
+                    name: `🔓 Unlock ${skill.name}`,
                     isSkill: true,
                     fn: () => {
                         skill.level = 1;
@@ -2596,7 +2891,7 @@ function showLevelUpMenu() {
                         showFloatingText(800, 400, `✨ ${skill.name} Unlocked! ✨`, '#ffd700');
                     }
                 });
-            } else if (skill.level < 5) {
+            } else if (skill.level < maxLevel) {
                 upgrades.push({
                     name: `⬆️ ${skill.name} Lv${skill.level + 1}`,
                     isSkill: true,
@@ -2607,8 +2902,9 @@ function showLevelUpMenu() {
                 });
             }
         }
-        chosen = upgrades.sort(() => Math.random() - 0.5).slice(0, 3);
     }
+    chosen = upgrades.sort(() => Math.random() - 0.5).slice(0, 3);
+
 
     chosen.forEach(up => {
         const btn = document.createElement('button');
@@ -2836,11 +3132,67 @@ function endGame() {
     const secs = game.state.gameTime % 60;
     const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
 
-    let msg = `Game Over!\nLevel: ${game.state.level}\nScore: ${game.state.score}\nSurvived: ${timeStr}`;
-    if (isNewBest) msg += `\n\n🏆 NEW HIGH SCORE!`;
+    // Populate Modal
+    document.getElementById('go-time').textContent = timeStr;
+    document.getElementById('go-level').textContent = game.state.level;
+    document.getElementById('go-score').textContent = game.state.score.toLocaleString();
 
-    alert(msg);
-    location.reload();
+    if (isNewBest) {
+        document.getElementById('go-score').innerHTML += ' <span style="font-size: 16px; color: #ffd700;">(NEW BEST!)</span>';
+    }
+
+    // Populate Skills
+    const skillsContainer = document.getElementById('go-skills');
+    skillsContainer.innerHTML = '';
+
+    // Active Skills (Q, W, E, R, T, Y)
+    const activeKeys = ['Q', 'W', 'E', 'R', 'T', 'Y'];
+    activeKeys.forEach(key => {
+        const skill = game.skills[key];
+        if (skill.level > 0) {
+            const el = document.createElement('div');
+            el.className = 'go-skill-icon';
+            el.innerHTML = `
+                ${key}
+                <div class="go-skill-lvl">${skill.level}</div>
+            `;
+            el.title = skill.name;
+            skillsContainer.appendChild(el);
+        }
+    });
+
+    // Passive Skills
+    const passiveKeys = ['LIGHTNING_RING', 'BLADE_ORBIT', 'FIRE_AURA', 'ICE_NOVA', 'POISON_CLOUD', 'HOLY_WATER'];
+    const passiveIcons = {
+        'LIGHTNING_RING': '⚡',
+        'BLADE_ORBIT': '🌀',
+        'FIRE_AURA': '🔥',
+        'ICE_NOVA': '❄️',
+        'POISON_CLOUD': '☠️',
+        'HOLY_WATER': '🌟'
+    };
+
+    passiveKeys.forEach(key => {
+        const skill = game.skills[key];
+        if (skill.level > 0) {
+            const el = document.createElement('div');
+            el.className = 'go-skill-icon';
+            el.style.borderColor = '#ffd700'; // Gold border for passives
+            el.innerHTML = `
+                ${passiveIcons[key]}
+                <div class="go-skill-lvl">${skill.level}</div>
+            `;
+            el.title = skill.name;
+            skillsContainer.appendChild(el);
+        }
+    });
+
+    // Show Modal
+    const modal = document.getElementById('gameOverModal');
+    modal.style.display = 'block';
+
+    // Play Game Over Sound (if available)
+    // audioSystem.gameOver(); 
 }
 
 // ===== RANDOM EVENTS =====
@@ -2868,47 +3220,45 @@ function spawnMeteorShower() {
             const worldX = playerWorldX + (Math.random() - 0.5) * 1200;
             const worldY = playerWorldY + (Math.random() - 0.5) * 800;
 
-            const warning = document.createElement('div');
-            warning.className = 'warning-zone';
-            warning.style.width = '100px';
-            warning.style.height = '100px';
-            // Position in screen coords but track world coords
-            warning.style.left = (worldX - game.camera.x) + 'px';
-            warning.style.top = (worldY - game.camera.y) + 'px';
-            warning.style.borderColor = '#ff6600';
-            warning.style.background = 'rgba(255, 102, 0, 0.15)';
-            warning.dataset.worldX = worldX;
-            warning.dataset.worldY = worldY;
-            game.canvas.appendChild(warning);
+            // Warning shadow on ground
+            const shadow = document.createElement('div');
+            shadow.className = 'warning-zone';
+            shadow.style.width = '100px';
+            shadow.style.height = '100px';
+            shadow.style.left = (worldX - game.camera.x) + 'px';
+            shadow.style.top = (worldY - game.camera.y) + 'px';
+            shadow.style.transform = 'translate(-50%, -50%)';
+            game.canvas.appendChild(shadow);
 
-            // Update warning position as camera moves
-            const updateWarning = setInterval(() => {
-                if (!warning.parentNode) {
-                    clearInterval(updateWarning);
+            // Update shadow position
+            const updateShadow = setInterval(() => {
+                if (!shadow.parentNode) {
+                    clearInterval(updateShadow);
                     return;
                 }
-                warning.style.left = (parseFloat(warning.dataset.worldX) - game.camera.x) + 'px';
-                warning.style.top = (parseFloat(warning.dataset.worldY) - game.camera.y) + 'px';
+                shadow.style.left = (worldX - game.camera.x) + 'px';
+                shadow.style.top = (worldY - game.camera.y) + 'px';
             }, 16);
 
+            // Falling meteor animation
             setTimeout(() => {
-                clearInterval(updateWarning);
-                if (warning.parentNode) game.canvas.removeChild(warning);
+                clearInterval(updateShadow);
+                if (shadow.parentNode) game.canvas.removeChild(shadow);
 
-                // Create falling meteor visual
                 const meteor = document.createElement('div');
                 meteor.style.position = 'absolute';
-                meteor.style.width = '30px';
-                meteor.style.height = '30px';
-                meteor.style.borderRadius = '50%';
-                meteor.style.background = 'radial-gradient(circle, #fff, #ff6600)';
-                meteor.style.boxShadow = '0 0 20px #ff6600, 0 0 40px #ff4400, 0 0 60px #ff0000';
-                meteor.style.left = (worldX - game.camera.x + 50) + 'px';
-                meteor.style.top = '-50px'; // Start from top
-                meteor.style.zIndex = '100';
+                meteor.style.fontSize = '60px';
+                meteor.textContent = '☄️';
+                meteor.style.zIndex = '150';
+                meteor.style.transition = 'transform 0.3s ease-in';
+
+                // Start high above
+                const startScreenX = worldX - game.camera.x + 100;
+                const startScreenY = worldY - game.camera.y - 600;
+                meteor.style.left = startScreenX + 'px';
+                meteor.style.top = startScreenY + 'px';
                 game.canvas.appendChild(meteor);
 
-                // Animate meteor falling
                 let meteorY = -50;
                 const targetY = worldY - game.camera.y + 50;
                 const fallSpeed = 15;
@@ -3341,3 +3691,828 @@ function createDashTrail(startX, startY, endX, endY, width = 30) {
 }
 
 window.onload = init;
+// ===== PASSIVE AOE SKILLS SYSTEM =====
+
+// Update all passive skills
+function updatePassiveSkills() {
+    if (game.skills.LIGHTNING_RING.level > 0) updateLightningRing();
+    if (game.skills.BLADE_ORBIT.level > 0) updateBladeOrbit();
+    if (game.skills.FIRE_AURA.level > 0) updateFireAura();
+    if (game.skills.ICE_NOVA.level > 0) updateIceNova();
+    if (game.skills.POISON_CLOUD.level > 0) updatePoisonCloud();
+    if (game.skills.HOLY_WATER.level > 0) updateHolyWater();
+}
+
+// ===== LIGHTNING RING ⚡ =====
+function updateLightningRing() {
+    const skill = game.passiveSkills.lightningRing;
+    const skillLevel = game.skills.LIGHTNING_RING.level;
+
+    // Initialize rings if not created
+    if (skill.rings.length === 0) {
+        initializeLightningRings(skillLevel);
+    }
+
+    const now = Date.now();
+
+    // Damage tick
+    if (now - skill.lastTick >= skill.tickRate) {
+        dealLightningDamage(skillLevel);
+        skill.lastTick = now;
+    }
+
+    // Update ring visual positions and rotation
+    skill.rings.forEach((ring, index) => {
+        // Rotate rings
+        ring.rotation += ring.rotationSpeed;
+        ring.el.style.transform = `translate(-50%, -50%) rotate(${ring.rotation}deg)`;
+
+        // Position relative to player
+        const playerScreenX = 800;
+        const playerScreenY = 500;
+        ring.el.style.left = playerScreenX + 'px';
+        ring.el.style.top = playerScreenY + 'px';
+    });
+}
+
+function initializeLightningRings(level) {
+    const skill = game.passiveSkills.lightningRing;
+
+    // Calculate number of rings based on level
+    const ringCount = level >= 5 ? 2 : 1;
+
+    for (let i = 0; i < ringCount; i++) {
+        const ring = createLightningRingSVG(i, ringCount, level);
+        skill.rings.push(ring);
+    }
+}
+
+function createLightningRingSVG(index, total, level) {
+    // Create SVG container
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.pointerEvents = 'none';
+    container.style.zIndex = '85';
+
+    const radius = game.passiveSkills.lightningRing.radius;
+    const size = radius * 2;
+
+    container.style.width = size + 'px';
+    container.style.height = size + 'px';
+
+    // Create SVG element
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', size);
+    svg.setAttribute('height', size);
+    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+    svg.style.filter = 'drop-shadow(0 0 8px #00ffff) drop-shadow(0 0 15px #00ffff)';
+
+    // Create lightning ring path with zigzag pattern
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const segments = 24; // Number of zigzag segments
+    let pathData = '';
+
+    for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        const nextAngle = ((i + 1) / segments) * Math.PI * 2;
+
+        // Alternate between inner and outer radius for zigzag effect
+        const currentRadius = radius + (i % 2 === 0 ? -5 : 5);
+        const x = radius + Math.cos(angle) * currentRadius;
+        const y = radius + Math.sin(angle) * currentRadius;
+
+        if (i === 0) {
+            pathData += `M ${x} ${y}`;
+        } else {
+            pathData += ` L ${x} ${y}`;
+        }
+    }
+
+    path.setAttribute('d', pathData + ' Z');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#00ffff');
+    path.setAttribute('stroke-width', '3');
+    path.setAttribute('opacity', '0.8');
+
+    svg.appendChild(path);
+    container.appendChild(svg);
+    game.canvas.appendChild(container);
+
+    // Rotation direction alternates for multiple rings
+    const rotationSpeed = (index % 2 === 0 ? 1 : -1) * 0.5;
+
+    return {
+        el: container,
+        rotation: 0,
+        rotationSpeed: rotationSpeed,
+        radius: radius
+    };
+}
+
+function dealLightningDamage(level) {
+    const skill = game.passiveSkills.lightningRing;
+    const playerWorldX = game.camera.x + 800;
+    const playerWorldY = game.camera.y + 500;
+
+    game.entities.enemies.forEach(enemy => {
+        const enemyX = enemy.worldX + enemy.w / 2;
+        const enemyY = enemy.worldY + enemy.h / 2;
+        const dist = Math.hypot(enemyX - playerWorldX, enemyY - playerWorldY);
+
+        if (dist <= skill.radius) {
+            damageEnemy(enemy, skill.damage);
+
+            // Create electric particle effect
+            const screenX = enemy.worldX - game.camera.x;
+            const screenY = enemy.worldY - game.camera.y;
+            createParticles(screenX, screenY, 3, 'electric', {
+                speed: 3,
+                lifetime: 300,
+                size: 4,
+                color: '#00ffff'
+            });
+
+            // Evolution: Chain lightning at level 9
+            if (level >= 9 && Math.random() < 0.3) {
+                chainLightning(enemy, playerWorldX, playerWorldY);
+            }
+        }
+    });
+}
+
+function chainLightning(sourceEnemy, playerX, playerY) {
+    // Find nearest enemy to chain to
+    let closestEnemy = null;
+    let closestDist = 200; // Max chain range
+
+    const sourceX = sourceEnemy.worldX + sourceEnemy.w / 2;
+    const sourceY = sourceEnemy.worldY + sourceEnemy.h / 2;
+
+    game.entities.enemies.forEach(enemy => {
+        if (enemy === sourceEnemy) return;
+
+        const enemyX = enemy.worldX + enemy.w / 2;
+        const enemyY = enemy.worldY + enemy.h / 2;
+        const dist = Math.hypot(enemyX - sourceX, enemyY - sourceY);
+
+        if (dist < closestDist) {
+            closestDist = dist;
+            closestEnemy = enemy;
+        }
+    });
+
+    if (closestEnemy) {
+        // Deal damage
+        damageEnemy(closestEnemy, game.passiveSkills.lightningRing.damage * 0.5);
+
+        // Visual: draw lightning bolt between enemies
+        const targetX = closestEnemy.worldX + closestEnemy.w / 2;
+        const targetY = closestEnemy.worldY + closestEnemy.h / 2;
+        createChainLightningVisual(sourceX, sourceY, targetX, targetY);
+    }
+}
+
+function createChainLightningVisual(x1, y1, x2, y2) {
+    const screenX1 = x1 - game.camera.x;
+    const screenY1 = y1 - game.camera.y;
+    const screenX2 = x2 - game.camera.x;
+    const screenY2 = y2 - game.camera.y;
+
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '0';
+    container.style.top = '0';
+    container.style.pointerEvents = 'none';
+    container.style.zIndex = '95';
+    game.canvas.appendChild(container);
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '1600');
+    svg.setAttribute('height', '1000');
+    svg.style.filter = 'drop-shadow(0 0 5px #00ffff)';
+
+    // Create zigzag path between points
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const segments = 5;
+    let pathData = `M ${screenX1} ${screenY1}`;
+
+    for (let i = 1; i < segments; i++) {
+        const t = i / segments;
+        const x = screenX1 + (screenX2 - screenX1) * t + (Math.random() - 0.5) * 15;
+        const y = screenY1 + (screenY2 - screenY1) * t + (Math.random() - 0.5) * 15;
+        pathData += ` L ${x} ${y}`;
+    }
+    pathData += ` L ${screenX2} ${screenY2}`;
+
+    path.setAttribute('d', pathData);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#00ffff');
+    path.setAttribute('stroke-width', '2');
+
+    svg.appendChild(path);
+    container.appendChild(svg);
+
+    // Remove after short duration
+    setTimeout(() => {
+        if (container.parentNode) game.canvas.removeChild(container);
+    }, 150);
+}
+
+// ===== BLADE ORBIT 🌀 =====
+function updateBladeOrbit() {
+    const skill = game.passiveSkills.bladeOrbit;
+    const skillLevel = game.skills.BLADE_ORBIT.level;
+
+    // Initialize blades if not created
+    if (skill.blades.length === 0) {
+        initializeBlades(skillLevel);
+    }
+
+    // Update rotation
+    skill.rotation += 2; // Degrees per frame
+
+    const playerScreenX = 800;
+    const playerScreenY = 500;
+    const playerWorldX = game.camera.x + playerScreenX;
+    const playerWorldY = game.camera.y + playerScreenY;
+
+    // Update each blade
+    skill.blades.forEach((blade, index) => {
+        const angleOffset = (index / skill.blades.length) * 360;
+        const currentAngle = (skill.rotation + angleOffset) * (Math.PI / 180);
+
+        const x = playerScreenX + Math.cos(currentAngle) * skill.orbitRadius;
+        const y = playerScreenY + Math.sin(currentAngle) * skill.orbitRadius;
+
+        blade.el.style.left = x + 'px';
+        blade.el.style.top = y + 'px';
+        blade.el.style.transform = `translate(-50%, -50%) rotate(${skill.rotation + angleOffset + 90}deg)`;
+
+        // Collision detection
+        const bladeWorldX = game.camera.x + x;
+        const bladeWorldY = game.camera.y + y;
+
+        game.entities.enemies.forEach(enemy => {
+            const enemyX = enemy.worldX + enemy.w / 2;
+            const enemyY = enemy.worldY + enemy.h / 2;
+            const dist = Math.hypot(enemyX - bladeWorldX, enemyY - bladeWorldY);
+
+            if (dist < 25) {
+                damageEnemy(enemy, skill.damage);
+
+                // Slash effect
+                createParticles(x, y, 5, 'spark', {
+                    speed: 4,
+                    lifetime: 300,
+                    size: 3,
+                    color: '#00ffff',
+                    startAngle: currentAngle,
+                    spread: Math.PI / 6
+                });
+            }
+        });
+    });
+}
+
+function initializeBlades(level) {
+    const skill = game.passiveSkills.bladeOrbit;
+
+    // Calculate blade count based on level
+    let bladeCount = skill.bladeCount;
+    if (level >= 2) bladeCount = Math.min(6, 3 + (level - 1));
+    if (level >= 6) bladeCount = Math.min(9, 6 + Math.floor((level - 5) / 2));
+
+    for (let i = 0; i < bladeCount; i++) {
+        const blade = createBladeSVG();
+        skill.blades.push(blade);
+    }
+}
+
+function createBladeSVG() {
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.pointerEvents = 'none';
+    container.style.zIndex = '90';
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '40');
+    svg.setAttribute('height', '40');
+    svg.setAttribute('viewBox', '0 0 40 40');
+    svg.style.filter = 'drop-shadow(0 0 5px #00ffff) blur(0.5px)'; // Motion blur effect
+
+    // Create blade shape (sword silhouette)
+    const blade = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    blade.setAttribute('d', 'M20,5 L22,15 L22,30 L20,35 L18,30 L18,15 Z M18,3 L20,2 L22,3 L22,5 L18,5 Z');
+    blade.setAttribute('fill', 'url(#bladeGradient)');
+    blade.setAttribute('stroke', '#00ffff');
+    blade.setAttribute('stroke-width', '1');
+
+    // Gradient for metallic look
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+    gradient.setAttribute('id', 'bladeGradient');
+    gradient.setAttribute('x1', '0%');
+    gradient.setAttribute('y1', '0%');
+    gradient.setAttribute('x2', '100%');
+    gradient.setAttribute('y2', '0%');
+
+    const stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop1.setAttribute('offset', '0%');
+    stop1.setAttribute('stop-color', '#6dd5ed');
+
+    const stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop2.setAttribute('offset', '50%');
+    stop2.setAttribute('stop-color', '#ffffff');
+
+    const stop3 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop3.setAttribute('offset', '100%');
+    stop3.setAttribute('stop-color', '#2193b0');
+
+    gradient.appendChild(stop1);
+    gradient.appendChild(stop2);
+    gradient.appendChild(stop3);
+    defs.appendChild(gradient);
+    svg.appendChild(defs);
+    svg.appendChild(blade);
+
+    container.appendChild(svg);
+    game.canvas.appendChild(container);
+
+    return {
+        el: container
+    };
+}
+
+// Cleanup function when skills are deactivated or game ends
+function cleanupPassiveSkills() {
+    // Remove lightning rings
+    game.passiveSkills.lightningRing.rings.forEach(ring => {
+        if (ring.el.parentNode) game.canvas.removeChild(ring.el);
+    });
+    game.passiveSkills.lightningRing.rings = [];
+
+    // Remove blades
+    game.passiveSkills.bladeOrbit.blades.forEach(blade => {
+        if (blade.el.parentNode) game.canvas.removeChild(blade.el);
+    });
+    game.passiveSkills.bladeOrbit.blades = [];
+
+    // Clear burn status
+    game.passiveSkills.fireAura.burnedEnemies.clear();
+
+    // Clear poison status
+    game.passiveSkills.poisonCloud.poisonedEnemies.clear();
+
+    // Remove holy water puddles
+    game.passiveSkills.holyWater.puddles.forEach(puddle => {
+        if (puddle.el.parentNode) game.canvas.removeChild(puddle.el);
+    });
+    game.passiveSkills.holyWater.puddles = [];
+}
+
+// ===== FIRE AURA 🔥 =====
+function updateFireAura() {
+    const skill = game.passiveSkills.fireAura;
+    const skillLevel = game.skills.FIRE_AURA.level;
+    const now = Date.now();
+
+    // Continuous damage tick
+    if (now - skill.lastTick >= skill.tickRate) {
+        dealFireAuraDamage(skillLevel);
+        skill.lastTick = now;
+    }
+
+    // Generate flame particles around player
+    if (Math.random() < 0.3) { // 30% chance per frame
+        const playerScreenX = 800;
+        const playerScreenY = 500;
+
+        // Random position within aura radius
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * skill.radius;
+        const x = playerScreenX + Math.cos(angle) * dist;
+        const y = playerScreenY + Math.sin(angle) * dist;
+
+        createParticles(x, y, 1, 'fire', {
+            speed: 1,
+            lifetime: 800,
+            size: 8,
+            color: '#ff6600',
+            vx: 0,
+            vy: -1 // Float upward
+        });
+    }
+
+    // Update burn DOT on enemies
+    skill.burnedEnemies.forEach((burnData, enemy) => {
+        if (now - burnData.lastTick >= 1000) {
+            if (!enemy.el.parentNode) {
+                // Enemy dead, remove from map
+                skill.burnedEnemies.delete(enemy);
+                return;
+            }
+
+            damageEnemy(enemy, skill.burnDOT);
+            burnData.lastTick = now;
+            burnData.duration -= 1000;
+
+            // Show burn effect
+            const screenX = enemy.worldX - game.camera.x;
+            const screenY = enemy.worldY - game.camera.y;
+            createParticles(screenX, screenY, 2, 'fire', {
+                speed: 0.5,
+                lifetime: 500,
+                size: 4,
+                color: '#ff3300'
+            });
+
+            if (burnData.duration <= 0) {
+                skill.burnedEnemies.delete(enemy);
+            }
+        }
+    });
+}
+
+function dealFireAuraDamage(level) {
+    const skill = game.passiveSkills.fireAura;
+    const playerWorldX = game.camera.x + 800;
+    const playerWorldY = game.camera.y + 500;
+
+    game.entities.enemies.forEach(enemy => {
+        const enemyX = enemy.worldX + enemy.w / 2;
+        const enemyY = enemy.worldY + enemy.h / 2;
+        const dist = Math.hypot(enemyX - playerWorldX, enemyY - playerWorldY);
+
+        if (dist <= skill.radius) {
+            damageEnemy(enemy, skill.damage);
+
+            // Apply burn DOT
+            if (!skill.burnedEnemies.has(enemy)) {
+                skill.burnedEnemies.set(enemy, {
+                    lastTick: Date.now(),
+                    duration: skill.burnDuration
+                });
+            } else {
+                // Refresh burn duration
+                const burnData = skill.burnedEnemies.get(enemy);
+                burnData.duration = skill.burnDuration;
+            }
+
+            // Level 5: Burn spreads to nearby enemies
+            if (level >= 5 && Math.random() < 0.1) {
+                spreadBurn(enemy, playerWorldX, playerWorldY);
+            }
+        }
+    });
+}
+
+function spreadBurn(sourceEnemy, playerX, playerY) {
+    const skill = game.passiveSkills.fireAura;
+    const sourceX = sourceEnemy.worldX + sourceEnemy.w / 2;
+    const sourceY = sourceEnemy.worldY + sourceEnemy.h / 2;
+
+    game.entities.enemies.forEach(enemy => {
+        if (enemy === sourceEnemy) return;
+        if (skill.burnedEnemies.has(enemy)) return;
+
+        const enemyX = enemy.worldX + enemy.w / 2;
+        const enemyY = enemy.worldY + enemy.h / 2;
+        const dist = Math.hypot(enemyX - sourceX, enemyY - sourceY);
+
+        if (dist < 100) {
+            skill.burnedEnemies.set(enemy, {
+                lastTick: Date.now(),
+                duration: skill.burnDuration
+            });
+        }
+    });
+}
+
+// ===== ICE NOVA ❄️ =====
+function updateIceNova() {
+    const skill = game.passiveSkills.iceNova;
+    const skillLevel = game.skills.ICE_NOVA.level;
+    const now = Date.now();
+
+    // Periodic cast
+    if (now - skill.lastCast >= skill.cooldown) {
+        castIceNova(skillLevel);
+        skill.lastCast = now;
+    }
+}
+
+function castIceNova(level) {
+    const skill = game.passiveSkills.iceNova;
+    const playerScreenX = 800;
+    const playerScreenY = 500;
+    const playerWorldX = game.camera.x + playerScreenX;
+    const playerWorldY = game.camera.y + playerScreenY;
+
+    // Create expanding frost wave
+    const wave = document.createElement('div');
+    wave.style.position = 'absolute';
+    wave.style.left = playerScreenX + 'px';
+    wave.style.top = playerScreenY + 'px';
+    wave.style.width = skill.radius * 2 + 'px';
+    wave.style.height = skill.radius * 2 + 'px';
+    wave.style.borderRadius = '50%';
+    wave.style.border = '3px solid #00ffff';
+    wave.style.background = 'radial-gradient(circle, rgba(0,255,255,0.3), transparent 70%)';
+    wave.style.transform = 'translate(-50%, -50%) scale(0)';
+    wave.style.pointerEvents = 'none';
+    wave.style.zIndex = '95';
+    wave.style.boxShadow = '0 0 20px #00ffff, inset 0 0 20px #00ffff';
+    game.canvas.appendChild(wave);
+
+    // Animate expansion
+    let currentRadius = 0;
+    const expandDuration = 800; // ms
+    const startTime = Date.now();
+
+    const expandInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / expandDuration, 1);
+
+        currentRadius = skill.radius + (skill.maxRadius - skill.radius) * progress;
+        const scale = currentRadius / skill.radius;
+
+        wave.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        wave.style.opacity = 1 - progress * 0.5;
+
+        // Deal damage and slow enemies in wave
+        game.entities.enemies.forEach(enemy => {
+            const enemyX = enemy.worldX + enemy.w / 2;
+            const enemyY = enemy.worldY + enemy.h / 2;
+            const dist = Math.hypot(enemyX - playerWorldX, enemyY - playerWorldY);
+
+            if (dist <= currentRadius && dist > currentRadius - 30) {
+                damageEnemy(enemy, skill.damage);
+
+                // Apply slow/freeze
+                const freezeDuration = level >= 5 ? 500 : 0;
+                const slowDuration = skill.slowDuration;
+
+                if (freezeDuration > 0) {
+                    enemy.frozen = true;
+                    setTimeout(() => { enemy.frozen = false; }, freezeDuration);
+                }
+
+                // Slow effect
+                const originalSpeed = enemy.speed;
+                enemy.speed *= (1 - skill.slow);
+                setTimeout(() => {
+                    if (!enemy.frozen) enemy.speed = originalSpeed;
+                }, slowDuration);
+
+                // Ice particles
+                const screenX = enemy.worldX - game.camera.x;
+                const screenY = enemy.worldY - game.camera.y;
+                createParticles(screenX, screenY, 5, 'ice', {
+                    speed: 2,
+                    lifetime: 600,
+                    size: 5,
+                    color: '#00ffff'
+                });
+            }
+        });
+
+        if (progress >= 1) {
+            clearInterval(expandInterval);
+            setTimeout(() => {
+                if (wave.parentNode) game.canvas.removeChild(wave);
+            }, 200);
+        }
+    }, 16);
+}
+
+// ===== POISON CLOUD ☠️ =====
+function updatePoisonCloud() {
+    const skill = game.passiveSkills.poisonCloud;
+    const skillLevel = game.skills.POISON_CLOUD.level;
+    const playerWorldX = game.camera.x + 800;
+    const playerWorldY = game.camera.y + 500;
+
+    // Generate poison fog particles
+    if (Math.random() < 0.2) {
+        const playerScreenX = 800;
+        const playerScreenY = 500;
+
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * skill.radius;
+        const x = playerScreenX + Math.cos(angle) * dist;
+        const y = playerScreenY + Math.sin(angle) * dist;
+
+        createParticles(x, y, 1, 'poison', {
+            speed: 0.3,
+            lifetime: 2000,
+            size: 12,
+            color: '#00ff00',
+            vx: (Math.random() - 0.5) * 0.5,
+            vy: (Math.random() - 0.5) * 0.5
+        });
+    }
+
+    const now = Date.now();
+
+    // Apply poison DOT to enemies in cloud
+    game.entities.enemies.forEach(enemy => {
+        const enemyX = enemy.worldX + enemy.w / 2;
+        const enemyY = enemy.worldY + enemy.h / 2;
+        const dist = Math.hypot(enemyX - playerWorldX, enemyY - playerWorldY);
+
+        if (dist <= skill.radius) {
+            if (!skill.poisonedEnemies.has(enemy)) {
+                skill.poisonedEnemies.set(enemy, {
+                    stacks: 1,
+                    lastTick: now,
+                    leftCloud: 0
+                });
+            } else {
+                const poisonData = skill.poisonedEnemies.get(enemy);
+                // Increase stacks up to 3
+                if (skillLevel >= 9 && poisonData.stacks < 3) {
+                    poisonData.stacks++;
+                }
+                poisonData.leftCloud = 0; // Still in cloud
+            }
+        } else {
+            // Enemy left cloud
+            if (skill.poisonedEnemies.has(enemy)) {
+                const poisonData = skill.poisonedEnemies.get(enemy);
+                if (poisonData.leftCloud === 0) {
+                    poisonData.leftCloud = now;
+                }
+            }
+        }
+    });
+
+    // Deal poison damage over time
+    skill.poisonedEnemies.forEach((poisonData, enemy) => {
+        if (!enemy.el.parentNode) {
+            skill.poisonedEnemies.delete(enemy);
+            return;
+        }
+
+        if (now - poisonData.lastTick >= 1000) {
+            const totalDOT = skill.dot * (skillLevel >= 9 ? poisonData.stacks : 1);
+            damageEnemy(enemy, totalDOT);
+            poisonData.lastTick = now;
+
+            // Poison particles
+            const screenX = enemy.worldX - game.camera.x;
+            const screenY = enemy.worldY - game.camera.y;
+            createParticles(screenX, screenY, 2, 'poison', {
+                speed: 1,
+                lifetime: 400,
+                size: 6,
+                color: '#00ff00'
+            });
+        }
+
+        // Remove poison after linger duration
+        if (poisonData.leftCloud > 0 && now - poisonData.leftCloud >= skill.lingerDuration) {
+            skill.poisonedEnemies.delete(enemy);
+        }
+    });
+}
+
+// ===== HOLY WATER 🌟 =====
+function updateHolyWater() {
+    const skill = game.passiveSkills.holyWater;
+    const skillLevel = game.skills.HOLY_WATER.level;
+    const now = Date.now();
+
+    // Drop puddles periodically
+    if (now - skill.lastDrop >= skill.dropInterval) {
+        dropHolyWaterPuddles(skillLevel);
+        skill.lastDrop = now;
+    }
+
+    // Update existing puddles
+    skill.puddles = skill.puddles.filter(puddle => {
+        if (now - puddle.created >= skill.puddleDuration) {
+            // Evolution: Explode on expiry
+            if (skillLevel >= 9) {
+                puddleExplosion(puddle);
+            }
+            if (puddle.el.parentNode) game.canvas.removeChild(puddle.el);
+            return false;
+        }
+
+        // Deal damage to enemies in puddle
+        if (now - puddle.lastTick >= skill.tickRate) {
+            dealPuddleDamage(puddle, skillLevel);
+            puddle.lastTick = now;
+        }
+
+        // Update puddle position (follows world coords)
+        puddle.el.style.left = (puddle.worldX - game.camera.x) + 'px';
+        puddle.el.style.top = (puddle.worldY - game.camera.y) + 'px';
+
+        return true;
+    });
+}
+
+function dropHolyWaterPuddles(level) {
+    const skill = game.passiveSkills.holyWater;
+    const playerWorldX = game.camera.x + 800;
+    const playerWorldY = game.camera.y + 500;
+
+    for (let i = 0; i < skill.puddleCount; i++) {
+        // Random position near player
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * 80;
+        const worldX = playerWorldX + Math.cos(angle) * dist;
+        const worldY = playerWorldY + Math.sin(angle) * dist;
+
+        // Create puddle element
+        const puddle = document.createElement('div');
+        puddle.style.position = 'absolute';
+        puddle.style.width = skill.puddleSize * 2 + 'px';
+        puddle.style.height = skill.puddleSize * 2 + 'px';
+        puddle.style.borderRadius = '50%';
+        puddle.style.background = 'radial-gradient(circle, rgba(255,215,0,0.6), rgba(255,215,0,0.1))';
+        puddle.style.boxShadow = '0 0 15px #ffd700, inset 0 0 10px #ffd700';
+        puddle.style.transform = 'translate(-50%, -50%)';
+        puddle.style.pointerEvents = 'none';
+        puddle.style.zIndex = '80';
+        puddle.style.animation = 'pulse 2s infinite';
+
+        puddle.style.left = (worldX - game.camera.x) + 'px';
+        puddle.style.top = (worldY - game.camera.y) + 'px';
+
+        game.canvas.appendChild(puddle);
+
+        skill.puddles.push({
+            el: puddle,
+            worldX: worldX,
+            worldY: worldY,
+            created: Date.now(),
+            lastTick: Date.now()
+        });
+    }
+}
+
+function dealPuddleDamage(puddle, level) {
+    const skill = game.passiveSkills.holyWater;
+
+    game.entities.enemies.forEach(enemy => {
+        const enemyX = enemy.worldX + enemy.w / 2;
+        const enemyY = enemy.worldY + enemy.h / 2;
+        const dist = Math.hypot(enemyX - puddle.worldX, enemyY - puddle.worldY);
+
+        if (dist <= skill.puddleSize) {
+            damageEnemy(enemy, skill.damage);
+
+            // Slow effect at level 5+
+            if (level >= 5 && !enemy.slowed) {
+                const originalSpeed = enemy.speed;
+                enemy.speed *= 0.7;
+                enemy.slowed = true;
+                setTimeout(() => {
+                    enemy.speed = originalSpeed;
+                    enemy.slowed = false;
+                }, 1000);
+            }
+
+            // Sparkle effect
+            const screenX = puddle.worldX - game.camera.x;
+            const screenY = puddle.worldY - game.camera.y;
+            if (Math.random() < 0.3) {
+                createParticles(screenX, screenY, 3, 'holy', {
+                    speed: 1.5,
+                    lifetime: 500,
+                    size: 4,
+                    color: '#ffd700'
+                });
+            }
+        }
+    });
+}
+
+function puddleExplosion(puddle) {
+    const skill = game.passiveSkills.holyWater;
+    const explosionRadius = skill.puddleSize * 2;
+
+    // Visual explosion
+    const screenX = puddle.worldX - game.camera.x;
+    const screenY = puddle.worldY - game.camera.y;
+    createExplosion(screenX, screenY, '#ffd700');
+    createParticles(screenX, screenY, 20, 'holy', {
+        speed: 5,
+        lifetime: 800,
+        size: 6,
+        color: '#ffd700'
+    });
+
+    // Damage enemies
+    game.entities.enemies.forEach(enemy => {
+        const enemyX = enemy.worldX + enemy.w / 2;
+        const enemyY = enemy.worldY + enemy.h / 2;
+        const dist = Math.hypot(enemyX - puddle.worldX, enemyY - puddle.worldY);
+
+        if (dist <= explosionRadius) {
+            damageEnemy(enemy, skill.damage * 3);
+        }
+    });
+}
