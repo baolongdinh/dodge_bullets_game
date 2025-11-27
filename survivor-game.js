@@ -85,8 +85,8 @@ const game = {
             lastCast: 0,
             lastCast: 0,
             cooldown: 5000,
-            radius: 350, // BUFFED: 250 -> 350
-            maxRadius: 600, // BUFFED: 400 -> 600
+            radius: 250, // BUFFED: 250 -> 350
+            maxRadius: 400, // BUFFED: 400 -> 600
             damage: 80, // BUFFED: 40 -> 80
             slow: 0.5,
             slowDuration: 2000
@@ -106,7 +106,7 @@ const game = {
             lastDrop: 0,
             dropInterval: 2000,
             puddleCount: 1,
-            puddleDuration: 5000,
+            puddleDuration: 3000,
             damage: 30, // BUFFED: 12 -> 30
             tickRate: 500,
             puddleSize: 100 // BUFFED: 60 -> 100
@@ -969,7 +969,7 @@ document.addEventListener('visibilitychange', () => {
 
 // ===== INPUT =====
 document.addEventListener('keydown', e => {
-    if (e.key === 'p' || e.key === 'P') togglePause();
+    if (e.key === 'p' || e.key === 'P' || e.key === 'Escape' || e.key === 'Tab') togglePause();
     if (!game.state.paused && !game.state.gameOver) {
         game.keys[e.key.toLowerCase()] = true;
     }
@@ -2028,9 +2028,9 @@ function createEnemy(type, isElite = false) {
 
     // Exponential scaling with difficulty - MUCH STRONGER
     let stats = {
-        hp: Math.floor(baseStats.hp * Math.pow(game.difficultyMultiplier, 0.6)), // NERFED: 1.5 -> 1.1 (Easier to kill)
+        hp: Math.floor(baseStats.hp * Math.pow(game.difficultyMultiplier, 0.8)), // NERFED: 1.5 -> 1.1 (Easier to kill)
         speed: Math.min(baseStats.speed * (1 + game.difficultyMultiplier * 0.12), baseStats.speed * 2.5), // Increased cap
-        damage: Math.floor(baseStats.damage * Math.pow(game.difficultyMultiplier, 0.6)), // NERFED: 1.0 -> 0.8
+        damage: Math.floor(baseStats.damage * Math.pow(game.difficultyMultiplier, 0.8)), // NERFED: 1.0 -> 0.8
         xp: Math.floor(baseStats.xp * Math.pow(game.difficultyMultiplier, 1.2)), // Increased from 0.6
         w: baseStats.w,
         h: baseStats.h
@@ -2491,6 +2491,30 @@ function collectItem(item) {
 
             skill.level++;
             updateSkillUI(selectedKey);
+
+            // SCALE STATS: +10% Range & +10% Damage per level
+            const passiveSkill = game.passiveSkills[selectedKey.replace(/_([A-Z])/g, (g) => g[1].toLowerCase()).toLowerCase().replace('lightningRing', 'lightningRing').replace('bladeOrbit', 'bladeOrbit').replace('fireAura', 'fireAura').replace('iceNova', 'iceNova').replace('poisonCloud', 'poisonCloud').replace('holyWater', 'holyWater')];
+
+            // Map keys to camelCase for passiveSkills object
+            let passiveObj = null;
+            if (selectedKey === 'LIGHTNING_RING') passiveObj = game.passiveSkills.lightningRing;
+            else if (selectedKey === 'BLADE_ORBIT') passiveObj = game.passiveSkills.bladeOrbit;
+            else if (selectedKey === 'FIRE_AURA') passiveObj = game.passiveSkills.fireAura;
+            else if (selectedKey === 'ICE_NOVA') passiveObj = game.passiveSkills.iceNova;
+            else if (selectedKey === 'POISON_CLOUD') passiveObj = game.passiveSkills.poisonCloud;
+            else if (selectedKey === 'HOLY_WATER') passiveObj = game.passiveSkills.holyWater;
+
+            if (passiveObj) {
+                // Buff Damage by 10%
+                if (passiveObj.damage) passiveObj.damage = Math.ceil(passiveObj.damage * 1.1);
+                if (passiveObj.dot) passiveObj.dot = Math.ceil(passiveObj.dot * 1.1);
+
+                // Buff Range/Radius by 10% (User Requested)
+                if (passiveObj.radius) passiveObj.radius = Math.ceil(passiveObj.radius * 1.1);
+                if (passiveObj.orbitRadius) passiveObj.orbitRadius = Math.ceil(passiveObj.orbitRadius * 1.1);
+                if (passiveObj.puddleSize) passiveObj.puddleSize = Math.ceil(passiveObj.puddleSize * 1.1);
+                if (passiveObj.maxRadius) passiveObj.maxRadius = Math.ceil(passiveObj.maxRadius * 1.1);
+            }
 
             // Visual feedback
             const action = skill.level === 1 ? 'Unlocked!' : 'Upgraded!';
