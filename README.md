@@ -2,6 +2,7 @@
 
 A fast-paced action RPG inspired by Vampire Survivors. Fight endless waves of enemies, unlock powerful skills, and survive as long as you can!
 
+### TRY NOW: https://baolongdinh.github.io/dodge_bullets_game
 ## Features
 - Auto-shooting projectile system
 - 6 Active Skills (Q, W, E, R, T, Y)
